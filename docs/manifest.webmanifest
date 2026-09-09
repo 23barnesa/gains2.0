@@ -1,0 +1,10 @@
+{
+  "name": "GainLog",
+  "short_name": "GainLog",
+  "description": "Personal muscle gain tracker and training coach",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0b0e12",
+  "theme_color": "#0b0e12"
+}
