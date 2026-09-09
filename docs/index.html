@@ -1,201 +1,146 @@
 <!doctype html>
-<html lang="en">
+<html>
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <meta name="theme-color" content="#101318">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-title" content="GainLog">
-
-  <title>GainLog</title>
-
-  <link rel="manifest" href="./manifest.webmanifest">
-  <link rel="stylesheet" href="./styles.css">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#101318">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>GainLog</title>
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="stylesheet" href="./styles.css">
 </head>
 
 <body>
 
 <header>
-  <b>GAINLOG</b>
-  <button onclick="backup()">Backup</button>
+<b>GAINLOG</b>
+<button onclick="backup()">Backup</button>
 </header>
 
 <main>
 
-  <!-- TODAY -->
-  <section id="today">
+<section id="today">
+<h1>Today</h1>
 
-    <h1>Today</h1>
+<div class="card">
+<h2>Nutrition</h2>
+<p><strong id="cals">0</strong> / 2750 calories</p>
+<progress id="cp" max="2750"></progress>
 
-    <div class="card">
-      <h2>Nutrition</h2>
+<p><strong id="pro">0</strong> / 155 g protein</p>
+<progress id="pp" max="155"></progress>
+</div>
 
-      <p>
-        <strong id="cals">0</strong> / 2750 calories
-      </p>
+<div class="card">
+<h2>Coach</h2>
+<p id="coach">Log food or training and I’ll keep the day on track.</p>
+</div>
 
-      <progress id="cp" max="2750" value="0"></progress>
-
-      <p>
-        <strong id="pro">0</strong> / 155 g protein
-      </p>
-
-      <progress id="pp" max="155" value="0"></progress>
-    </div>
-
-    <div class="card">
-      <h2>Coach</h2>
-
-      <p id="coach">
-        Log food or training and I’ll keep the day on track.
-      </p>
-    </div>
-
-    <div class="card">
-      <h2>Bodyweight</h2>
-
-      <input
-        id="wt"
-        inputmode="decimal"
-        placeholder="152.0 lb"
-      >
-
-      <button onclick="addWeight()">
-        Save weight
-      </button>
-    </div>
-
-  </section>
+<div class="card">
+<h2>Bodyweight</h2>
+<input id="wt" inputmode="decimal" placeholder="152.0 lb">
+<button onclick="addWeight()">Save weight</button>
+</div>
+</section>
 
 
-  <!-- FOOD -->
-  <section id="food">
+<section id="food">
+<h1>Food</h1>
 
-    <h1>Food</h1>
+<div class="card">
+<textarea id="foodtxt"
+placeholder="bowl of Honey Nut Cheerios with milk"></textarea>
 
-    <div class="card">
+<button onclick="addFood()">Estimate & add</button>
 
-      <textarea
-        id="foodtxt"
-        placeholder="bowl of Honey Nut Cheerios with milk"
-      ></textarea>
+<small>
+Quick normal-portion estimates; no weighing required.
+</small>
+</div>
 
-      <button onclick="addFood()">
-        Estimate & add
-      </button>
-
-      <small>
-        Quick normal-portion estimates; no weighing required.
-      </small>
-
-    </div>
-
-    <div id="foods"></div>
-
-  </section>
+<div id="foods"></div>
+</section>
 
 
-  <!-- WORKOUT -->
-  <section id="workout">
+<section id="workout">
+<h1>Workout</h1>
 
-    <h1>Workout</h1>
+<div id="days"></div>
+<div id="ex"></div>
 
-    <div id="days"></div>
-
-    <div id="ex"></div>
-
-    <button onclick="finish()">
-      Finish workout
-    </button>
-
-  </section>
+<button onclick="finish()">Finish workout</button>
+</section>
 
 
-  <!-- PROGRESS -->
-  <section id="progress">
+<section id="progress">
+<h1>Progress</h1>
 
-    <h1>Progress</h1>
+<div class="card">
+<h2>Recent weigh-ins</h2>
+<div id="weights"></div>
+</div>
 
-    <div class="card">
-
-      <h2>Recent weigh-ins</h2>
-
-      <div id="weights"></div>
-
-    </div>
-
-    <div class="card">
-
-      <h2>Training</h2>
-
-      <p id="sessions"></p>
-
-    </div>
-
-  </section>
+<div class="card">
+<h2>Training</h2>
+<p id="sessions"></p>
+</div>
+</section>
 
 
-  <!-- COACH -->
-  <section id="settings">
+<section id="settings">
+<h1>Coach</h1>
 
-    <h1>Coach</h1>
+<div class="card">
+<h2>Training Guidance</h2>
 
-    <div class="card">
+<p>
+Keep compounds around 1–2 RIR and use double progression
+before increasing weight.
+</p>
 
-      <h2>Training guidance</h2>
+<p>
+Once you reach the top of the rep range cleanly on every
+working set, increase the load next session.
+</p>
 
-      <p>
-        Keep compounds around 1–2 RIR and use double
-        progression before increasing weight.
-      </p>
-
-      <p>
-        Once you reach the top of the rep range cleanly on
-        every working set, increase the load next session.
-      </p>
-
-      <p>
-        If your shoulder has joint pain, stop or swap the
-        movement instead of training through it.
-      </p>
-
-    </div>
-
-  </section>
+<p>
+If your shoulder has joint pain, stop or swap the movement
+instead of training through it.
+</p>
+</div>
+</section>
 
 </main>
 
 
-<!-- BOTTOM NAVIGATION -->
 <nav>
 
-  <button onclick="go('today')">
-    ⌂
-    <span>Today</span>
-  </button>
+<button onclick="go('today')">
+⌂
+<span>Today</span>
+</button>
 
-  <button onclick="go('food')">
-    ＋
-    <span>Food</span>
-  </button>
+<button onclick="go('food')">
+＋
+<span>Food</span>
+</button>
 
-  <button onclick="go('workout')">
-    ▣
-    <span>Workout</span>
-  </button>
+<button onclick="go('workout')">
+▣
+<span>Workout</span>
+</button>
 
-  <button onclick="go('progress')">
-    ↗
-    <span>Progress</span>
-  </button>
+<button onclick="go('progress')">
+↗
+<span>Progress</span>
+</button>
 
-  <button onclick="go('settings')">
-    ✦
-    <span>Coach</span>
-  </button>
+<button onclick="go('settings')">
+✦
+<span>Coach</span>
+</button>
 
 </nav>
-
 
 <script src="./app.js"></script>
 
