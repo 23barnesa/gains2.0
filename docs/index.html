@@ -1,148 +1,65 @@
 <!doctype html>
-<html>
+<html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#101318">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<title>GainLog</title>
-<link rel="manifest" href="./manifest.webmanifest">
-<link rel="stylesheet" href="./styles.css">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#0b0e12">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="GainLog">
+  <title>GainLog</title>
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="stylesheet" href="./styles.css?v=2.1.0">
 </head>
-
 <body>
-
-<header>
-<b>GAINLOG</b>
-<button onclick="backup()">Backup</button>
-</header>
-
-<main>
-
-<section id="today">
-<h1>Today</h1>
-
-<div class="card">
-<h2>Nutrition</h2>
-<p><strong id="cals">0</strong> / 2750 calories</p>
-<progress id="cp" max="2750"></progress>
-
-<p><strong id="pro">0</strong> / 155 g protein</p>
-<progress id="pp" max="155"></progress>
-</div>
-
-<div class="card">
-<h2>Coach</h2>
-<p id="coach">Log food or training and I’ll keep the day on track.</p>
-</div>
-
-<div class="card">
-<h2>Bodyweight</h2>
-<input id="wt" inputmode="decimal" placeholder="152.0 lb">
-<button onclick="addWeight()">Save weight</button>
-</div>
-</section>
-
-
-<section id="food">
-<h1>Food</h1>
-
-<div class="card">
-<textarea id="foodtxt"
-placeholder="bowl of Honey Nut Cheerios with milk"></textarea>
-
-<button onclick="addFood()">Estimate & add</button>
-
-<small>
-Quick normal-portion estimates; no weighing required.
-</small>
-</div>
-
-<div id="foods"></div>
-</section>
-
-
-<section id="workout">
-<h1>Workout</h1>
-
-<div id="days"></div>
-<div id="ex"></div>
-
-<button onclick="finish()">Finish workout</button>
-</section>
-
-
-<section id="progress">
-<h1>Progress</h1>
-
-<div class="card">
-<h2>Recent weigh-ins</h2>
-<div id="weights"></div>
-</div>
-
-<div class="card">
-<h2>Training</h2>
-<p id="sessions"></p>
-</div>
-</section>
-
-
-<section id="settings">
-<h1>Coach</h1>
-
-<div class="card">
-<h2>Training Guidance</h2>
-
-<p>
-Keep compounds around 1–2 RIR and use double progression
-before increasing weight.
-</p>
-
-<p>
-Once you reach the top of the rep range cleanly on every
-working set, increase the load next session.
-</p>
-
-<p>
-If your shoulder has joint pain, stop or swap the movement
-instead of training through it.
-</p>
-</div>
-</section>
-
-</main>
-
-
-<nav>
-
-<button onclick="go('today')">
-⌂
-<span>Today</span>
-</button>
-
-<button onclick="go('food')">
-＋
-<span>Food</span>
-</button>
-
-<button onclick="go('workout')">
-▣
-<span>Workout</span>
-</button>
-
-<button onclick="go('progress')">
-↗
-<span>Progress</span>
-</button>
-
-<button onclick="go('settings')">
-✦
-<span>Coach</span>
-</button>
-
-</nav>
-
-<script src="./app.js"></script>
-
+  <header><b>GAINLOG</b><button class="ghost small" onclick="go('settings')" aria-label="Settings">Settings</button></header>
+  <main>
+    <section id="today">
+      <div class="page-title"><div><span class="eyebrow" id="todayDate"></span><h1>Today</h1></div></div>
+      <div class="card nutrition-card">
+        <div class="card-head"><h2>Nutrition</h2><span class="pill">Goal</span></div>
+        <div class="metric"><span><strong id="cals">0</strong> / 2750 cal</span><span id="calLeft" class="muted"></span></div><progress id="cp" max="2750"></progress>
+        <div class="metric"><span><strong id="pro">0</strong> / 155 g protein</span><span id="proLeft" class="muted"></span></div><progress id="pp" max="155"></progress>
+      </div>
+      <div class="card coach-preview" onclick="go('coachScreen')"><div class="card-head"><h2>Coach</h2><span class="chevron">›</span></div><p id="coachSummary">Log food or training and I’ll keep the day on track.</p></div>
+      <div class="card"><h2>Bodyweight</h2><div class="inline-form"><input id="wt" inputmode="decimal" placeholder="152.0 lb" aria-label="Bodyweight"><button onclick="addWeight()">Save</button></div></div>
+    </section>
+    <section id="food">
+      <div class="page-title"><h1>Food</h1></div>
+      <div class="card"><textarea id="foodtxt" placeholder="bowl of Honey Nut Cheerios with milk" aria-label="Food description"></textarea><button class="primary wide" onclick="addFood()">Estimate & add</button><small>Quick normal-portion estimates. Tap an entry to correct it.</small></div>
+      <div id="foods"></div>
+    </section>
+    <section id="workout">
+      <div class="page-title"><div><span class="eyebrow">Hypertrophy</span><h1>Workout</h1></div><button id="discardWorkout" class="ghost small hidden" onclick="discardDraft()">Discard</button></div>
+      <div id="days" class="days"></div><div id="workoutHint" class="workout-hint"></div><div id="ex"></div>
+      <button class="primary wide finish-button" onclick="finishWorkout()">Finish workout</button>
+    </section>
+    <section id="progress">
+      <div class="page-title"><h1>Progress</h1></div>
+      <div class="card"><div class="card-head"><h2>Recent weigh-ins</h2><span id="weightTrend" class="pill"></span></div><div id="weights"></div></div>
+      <div class="card"><div class="card-head"><h2>Training</h2><span id="sessionsWeek" class="pill"></span></div><p id="sessions"></p><div id="recentWorkouts"></div></div>
+      <div class="card"><div class="card-head"><h2>Muscle coverage</h2><div class="segmented"><button id="coverageLast" class="on" onclick="setCoverageRange('last')">Last</button><button id="coverageWeek" onclick="setCoverageRange('week')">7 days</button></div></div><p class="muted compact">Quality of hypertrophy stimulus, not a race to 100.</p><div id="coverage"></div></div>
+    </section>
+    <section id="coachScreen">
+      <div class="page-title"><div><span class="eyebrow">Local guidance</span><h1>Coach</h1></div></div>
+      <div class="coach-note">Rules-based coaching from your GainLog history. Secure AI can be added later.</div>
+      <div id="coachMessages" class="chat"></div>
+      <div class="quick-prompts"><button onclick="askCoach('What should I focus on next workout?')">Next workout</button><button onclick="askCoach('How is my muscle coverage?')">Muscle coverage</button><button onclick="askCoach('What should I eat tonight?')">Food tonight</button></div>
+      <div class="chat-input"><input id="coachInput" placeholder="Ask about training or food…" aria-label="Ask Coach"><button onclick="sendCoachMessage()">Send</button></div>
+    </section>
+    <section id="settings">
+      <div class="page-title"><h1>Settings</h1></div>
+      <div class="card"><h2>Data</h2><p class="muted">Your data stays on this device unless you export it.</p><div class="button-row"><button onclick="backup()">Backup JSON</button><button onclick="document.getElementById('restoreFile').click()">Restore JSON</button></div><input id="restoreFile" class="hidden" type="file" accept="application/json" onchange="restoreBackup(event)"></div>
+      <div class="card"><h2>Training guardrails</h2><p>Compounds: usually 1–2 RIR. Isolations: usually 0–2 RIR. Stop or swap any movement causing joint pain.</p></div>
+      <div class="card"><h2>App</h2><p class="muted">GainLog 2.1 · local-first PWA</p><button id="updateButton" class="hidden" onclick="applyUpdate()">Install update</button></div>
+    </section>
+  </main>
+  <div id="restTimer" class="rest-timer hidden"><div><span>REST</span><strong id="restClock">1:00</strong><small id="restExercise"></small></div><div class="timer-actions"><button onclick="addRest(15)">+15</button><button onclick="addRest(30)">+30</button><button onclick="skipRest()">Skip</button></div></div>
+  <div id="modal" class="modal hidden" role="dialog" aria-modal="true" onclick="modalBackdrop(event)"><div id="modalSheet" class="sheet"></div></div>
+  <div id="toast" class="toast hidden" role="status"></div>
+  <nav>
+    <button data-screen="today" onclick="go('today')"><b>⌂</b><span>Today</span></button><button data-screen="food" onclick="go('food')"><b>＋</b><span>Food</span></button><button data-screen="workout" onclick="go('workout')"><b>▣</b><span>Workout</span></button><button data-screen="progress" onclick="go('progress')"><b>↗</b><span>Progress</span></button><button data-screen="coachScreen" onclick="go('coachScreen')"><b>✦</b><span>Coach</span></button>
+  </nav>
+  <script src="./app.js?v=2.1.0"></script>
 </body>
 </html>

@@ -2,9 +2,12 @@
   "name": "GainLog",
   "short_name": "GainLog",
   "description": "Personal muscle gain tracker and training coach",
+  "id": "./",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
+  "orientation": "portrait-primary",
+  "categories": ["fitness", "health"],
   "background_color": "#0b0e12",
   "theme_color": "#0b0e12"
 }
