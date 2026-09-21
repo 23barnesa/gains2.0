@@ -167,7 +167,11 @@ function renderWorkout(){
   document.getElementById("workoutHint").textContent=D.workoutDraft.hasData?"Workout in progress · saved on this device":"Log a complete set to start its rest timer.";
   box.innerHTML=program.map((e,ei)=>{
     const last=lastExercise(e.name,e.base), lastSets=last?.exercise.sets?.filter(s=>s&&s.reps)||[];
-    const lastHtml=last?`<div class="last-time"><span>LAST TIME</span><strong>${escapeHTML(lastSets[0]?.weight||"—")} lb</strong><b>${lastSets.map(s=>escapeHTML(s.reps)).join(" / ")||"No sets"}</b></div>`:"";
+    const lastWeights=[...new Set(lastSets.map(s=>s.weight).filter(v=>v!==null&&v!==undefined&&v!=="").map(String))];
+    const lastResult=!lastSets.length?"No completed sets":lastWeights.length===1
+      ? `<strong>${escapeHTML(lastWeights[0])} lb</strong><b>${lastSets.map(s=>escapeHTML(s.reps)).join(" / ")} reps</b>`
+      : `<b>${lastSets.map(s=>`${escapeHTML(s.weight??"—")} lb × ${escapeHTML(s.reps)}`).join(" · ")}</b>`;
+    const lastHtml=last?`<div class="last-time"><span>LAST TIME</span><div class="last-result">${lastResult}</div></div>`:"";
     const sets=Array.from({length:e.sets},(_,si)=>{const v=D.workoutDraft.sets[draftKey(ei,si)]||{};return `<div class="set ${v.logged?"logged":""}" data-row="${ei}-${si}"><button class="set-number" onclick="logSet(${ei},${si})">${v.logged?"✓":si+1}</button><input inputmode="decimal" placeholder="lb" value="${escapeHTML(v.weight||"")}" oninput="updateDraft(${ei},${si},'weight',this.value)"><input inputmode="numeric" placeholder="reps" value="${escapeHTML(v.reps||"")}" oninput="updateDraft(${ei},${si},'reps',this.value)"><input inputmode="decimal" placeholder="RIR" value="${escapeHTML(v.rir||"")}" oninput="updateDraft(${ei},${si},'rir',this.value)"></div>`;}).join("");
     return `<article class="exercise"><div class="exercise-head"><div><h3>${escapeHTML(e.name)}</h3><small>${e.sets} sets · ${e.range} reps</small></div><button class="swap" onclick="showSwap(${ei})">↻ Swap</button></div>${lastHtml}<p class="guidance">${escapeHTML(progressionText(e,last))}</p><div class="set set-labels"><span></span><span>Weight</span><span>Reps</span><span>RIR</span></div>${sets}</article>`;
   }).join("");
