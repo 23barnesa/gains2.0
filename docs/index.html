@@ -9,7 +9,7 @@
   <meta name="apple-mobile-web-app-title" content="GainLog">
   <title>GainLog</title>
   <link rel="manifest" href="./manifest.webmanifest">
-  <link rel="stylesheet" href="./styles.css?v=2.3.0">
+  <link rel="stylesheet" href="./styles.css?v=2.5.0">
 </head>
 <body>
   <header><b>GAINLOG</b><button class="ghost small" onclick="go('settings')" aria-label="Settings">Settings</button></header>
@@ -26,7 +26,7 @@
     </section>
     <section id="food">
       <div class="page-title"><h1>Food</h1></div>
-      <div class="card"><textarea id="foodtxt" placeholder="bowl of Honey Nut Cheerios with milk" aria-label="Food description"></textarea><button class="primary wide" onclick="addFood()">Estimate & add</button><small>Quick normal-portion estimates. Tap an entry to correct it.</small></div>
+      <div class="card"><textarea id="foodtxt" placeholder="500 cal muffin with a Coke" aria-label="Food description"></textarea><button id="addFoodButton" class="primary wide" onclick="addFood()">Estimate & add</button><small>Secure AI estimates normal portions and combined foods. Tap an entry to correct it.</small></div>
       <div id="foods"></div>
     </section>
     <section id="workout">
@@ -35,20 +35,38 @@
       <button class="primary wide finish-button" onclick="finishWorkout()">Finish workout</button>
     </section>
     <section id="progress">
-      <div class="page-title"><h1>Progress</h1></div>
+      <div class="page-title"><h1>Progress</h1><button class="ghost small" onclick="go('calendar')">Calendar</button></div>
       <div class="card"><div class="card-head"><h2>Recent weigh-ins</h2><span id="weightTrend" class="pill"></span></div><div id="weights"></div></div>
       <div class="card"><div class="card-head"><h2>Training</h2><span id="sessionsWeek" class="pill"></span></div><p id="sessions"></p><div id="recentWorkouts"></div></div>
       <div class="card"><div class="card-head"><h2>Muscle coverage</h2><div class="segmented"><button id="coverageLast" class="on" onclick="setCoverageRange('last')">Last</button><button id="coverageWeek" onclick="setCoverageRange('week')">7 days</button></div></div><p class="muted compact">Quality of hypertrophy stimulus, not a race to 100.</p><div id="coverage"></div></div>
     </section>
+    <section id="calendar">
+      <div class="page-title"><div><span class="eyebrow">History</span><h1>Calendar</h1></div><button class="ghost small" onclick="go('progress')">Progress</button></div>
+      <div class="card calendar-card">
+        <div class="calendar-nav"><button class="ghost small" onclick="changeCalendarMonth(-1)" aria-label="Previous month">‹</button><h2 id="calendarTitle"></h2><button class="ghost small" onclick="changeCalendarMonth(1)" aria-label="Next month">›</button></div>
+        <div class="calendar-weekdays"><span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span></div>
+        <div id="calendarGrid" class="calendar-grid"></div>
+        <small>Tap a day to see food, workouts, sets, and weight.</small>
+      </div>
+      <div id="calendarDetail" class="card calendar-detail"></div>
+    </section>
     <section id="coachScreen">
-      <div class="page-title"><div><span class="eyebrow">Adaptive guidance</span><h1>Coach</h1></div></div>
-      <div class="coach-note">Secure AI uses a limited view of your recent GainLog history. If the backend is unavailable, replies are clearly labeled Local.</div>
+      <div class="page-title"><div><span class="eyebrow">Adaptive guidance</span><h1>Coach</h1></div><span id="coachConnectionStatus" class="pill">Secure AI ready</span></div>
+      <div class="coach-note">Secure AI uses a limited view of your recent GainLog history and saved weekly schedule. If the backend is unavailable, replies are clearly labeled Local.</div>
       <div id="coachMessages" class="chat"></div>
-      <div class="quick-prompts"><button onclick="askCoach('What should I focus on next workout?')">Next workout</button><button onclick="askCoach('How is my muscle coverage?')">Muscle coverage</button><button onclick="askCoach('What should I eat tonight?')">Food tonight</button></div>
+      <div class="quick-prompts"><button onclick="askCoach('Plan my workout and homework times this week using my saved schedule.')">Plan my week</button><button onclick="askCoach('What should I focus on next workout?')">Next workout</button><button onclick="askCoach('How is my muscle coverage?')">Muscle coverage</button><button onclick="askCoach('What should I eat tonight?')">Food tonight</button></div>
       <div class="chat-input"><input id="coachInput" placeholder="Ask about training or food…" aria-label="Ask Coach"><button onclick="sendCoachMessage()">Send</button></div>
     </section>
     <section id="settings">
       <div class="page-title"><h1>Settings</h1></div>
+      <div class="card schedule-card">
+        <div class="card-head"><h2>Weekly planner</h2><span class="pill">Coach-aware</span></div>
+        <p class="muted compact">Paste your repeating class and work schedule. It stays on this device and is sent with your limited context only when you ask Secure AI Coach.</p>
+        <label>Classes, work, and fixed commitments<textarea id="weeklySchedule" class="schedule-text" placeholder="Mon: class 9–11, work 2–6&#10;Tue: class 10–3&#10;Wed: class 9–11..."></textarea></label>
+        <label>Homework and study needs<textarea id="homeworkNeeds" class="schedule-text short" placeholder="Circuits lab due Friday; protect two 2-hour homework blocks."></textarea></label>
+        <div class="two-col schedule-numbers"><label>Workouts per week<input id="scheduleWorkoutCount" type="number" min="1" max="6" inputmode="numeric"></label><label>Workout length<input id="scheduleWorkoutLength" type="number" min="30" max="150" step="5" inputmode="numeric"><small>minutes</small></label></div>
+        <div class="button-stack"><button class="primary wide" onclick="saveSchedule()">Save schedule</button><button class="ghost wide" onclick="planMyWeek()">Save & ask Coach to plan</button></div>
+      </div>
       <div class="card">
         <div class="card-head"><h2>Notifications</h2><span id="notificationStatus" class="pill">Not enabled</span></div>
         <p id="notificationHelp" class="muted compact">Enable alerts from your installed GainLog app.</p>
@@ -63,7 +81,7 @@
       </div>
       <div class="card"><h2>Data</h2><p class="muted">Your data stays on this device unless you export it.</p><div class="button-row"><button onclick="backup()">Backup JSON</button><button onclick="document.getElementById('restoreFile').click()">Restore JSON</button></div><input id="restoreFile" class="hidden" type="file" accept="application/json" onchange="restoreBackup(event)"></div>
       <div class="card"><h2>Training guardrails</h2><p>Compounds: usually 1–2 RIR. Isolations: usually 0–2 RIR. Stop or swap any movement causing joint pain.</p></div>
-      <div class="card"><h2>App</h2><p class="muted">GainLog 2.3 · local-first PWA with secure AI fallback</p><button id="updateButton" class="hidden" onclick="applyUpdate()">Install update</button></div>
+      <div class="card"><h2>App</h2><p class="muted">GainLog 2.5 · AI food estimates and schedule-aware Coach</p><button id="updateButton" class="hidden" onclick="applyUpdate()">Install update</button></div>
     </section>
   </main>
   <div id="restTimer" class="rest-timer hidden"><div><span>REST</span><strong id="restClock">1:00</strong><small id="restExercise"></small></div><div class="timer-actions"><button onclick="addRest(15)">+15</button><button onclick="addRest(30)">+30</button><button onclick="skipRest()">Skip</button></div></div>
@@ -72,6 +90,6 @@
   <nav>
     <button data-screen="today" onclick="go('today')"><b>⌂</b><span>Today</span></button><button data-screen="food" onclick="go('food')"><b>＋</b><span>Food</span></button><button data-screen="workout" onclick="go('workout')"><b>▣</b><span>Workout</span></button><button data-screen="progress" onclick="go('progress')"><b>↗</b><span>Progress</span></button><button data-screen="coachScreen" onclick="go('coachScreen')"><b>✦</b><span>Coach</span></button>
   </nav>
-  <script src="./app.js?v=2.3.0"></script>
+  <script src="./app.js?v=2.5.0"></script>
 </body>
 </html>
