@@ -1,4 +1,4 @@
-const APP_VERSION = 4;
+const APP_VERSION = 6;
 const COACH_API_URL = "https://gainlog-coach-23barnesa.vercel.app/api/coach";
 const TARGETS = { calories: 2750, protein: 155 };
 const PROGRAM = {
@@ -43,7 +43,8 @@ const EXERCISES = {
 };
 const MUSCLES = ["Upper chest","Mid/lower chest","Front delts","Side delts","Rear delts","Lats","Upper/mid back","Biceps","Triceps","Quads","Hamstrings","Glutes","Calves"];
 const NOTIFICATION_DEFAULTS = { enabled:false, restComplete:true, workout:true, workoutTime:"11:00", nutrition:true, nutritionTime:"20:00", bodyweight:true, bodyweightTime:"08:00" };
-const DEFAULTS = { version:APP_VERSION, foods:[], weights:[], workouts:[], swaps:[], preferences:{}, coachMessages:[], earlyEndReasons:[], programOverrides:{}, restHistory:[], restPreferences:{}, notificationHistory:[], notifications:{...NOTIFICATION_DEFAULTS}, workoutDraft:null };
+const SCHEDULE_DEFAULTS = { weeklySchedule:"", homeworkNeeds:"", workoutsPerWeek:3, workoutDurationMinutes:60, updatedAt:null };
+const DEFAULTS = { version:APP_VERSION, foods:[], weights:[], workouts:[], swaps:[], preferences:{}, coachMessages:[], earlyEndReasons:[], programOverrides:{}, restHistory:[], restPreferences:{}, notificationHistory:[], notifications:{...NOTIFICATION_DEFAULTS}, schedule:{...SCHEDULE_DEFAULTS}, workoutDraft:null };
 
 function loadData() {
   let stored = {};
@@ -52,6 +53,7 @@ function loadData() {
   ["foods","weights","workouts","swaps","coachMessages","earlyEndReasons","restHistory","notificationHistory"].forEach(k => { if (!Array.isArray(merged[k])) merged[k] = []; });
   ["preferences","programOverrides","restPreferences"].forEach(k => { if (!merged[k] || typeof merged[k] !== "object" || Array.isArray(merged[k])) merged[k] = {}; });
   merged.notifications={...NOTIFICATION_DEFAULTS,...(stored.notifications&&typeof stored.notifications==="object"?stored.notifications:{})};
+  merged.schedule={...SCHEDULE_DEFAULTS,...(stored.schedule&&typeof stored.schedule==="object"&&!Array.isArray(stored.schedule)?stored.schedule:{})};
   merged.version = APP_VERSION;
   return merged;
 }
@@ -63,6 +65,10 @@ let restInterval = null;
 let pendingSwap = null;
 let waitingWorker = null;
 let coachPending = false;
+let foodPending = false;
+let coachConnectionState = localStorage.getItem("gainlog-coach-status") || "ready";
+let calendarCursor = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+let selectedCalendarDate = dateKey();
 
 function save() { localStorage.setItem("gainlog", JSON.stringify(D)); }
 function isoNow() { return new Date().toISOString(); }
@@ -79,6 +85,7 @@ function go(id) {
   document.getElementById(id)?.classList.add("active");
   document.querySelectorAll("nav button").forEach(b=>b.classList.toggle("on", b.dataset.screen===id));
   if (id==="progress") renderProgress();
+  if (id==="calendar") renderCalendar();
   if (id==="coachScreen") renderCoach();
   window.scrollTo(0,0);
 }
@@ -120,14 +127,28 @@ function estimateFood(text) {
   if (/(small|little portion)/.test(x)) {r.cal=Math.round(r.cal*.7);r.protein=Math.round(r.protein*.75);}
   return r;
 }
-function addFood() {
-  const input=document.getElementById("foodtxt"), text=input.value.trim(); if(!text)return;
-  const e=estimateFood(text); D.foods.unshift({id:uid(),name:text,cal:e.cal,protein:e.protein,date:new Date().toDateString(),dateKey:dateKey(),createdAt:isoNow()});
-  save(); input.value=""; renderFood(); renderToday(); toast("Food added");
+async function requestAiFood(text){
+  const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),25000);
+  try{
+    const response=await fetch(COACH_API_URL,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({type:"food_estimate",food:text}),signal:controller.signal});
+    if(!response.ok)throw new Error(`Food estimator returned ${response.status}`);
+    const data=await response.json();
+    if(!Number.isFinite(Number(data.calories))||!Number.isFinite(Number(data.protein)))throw new Error("Food estimate was incomplete");
+    return {calories:Math.round(Number(data.calories)),protein:Math.round(Number(data.protein)),note:String(data.note||"").trim()};
+  }finally{clearTimeout(timeout);}
+}
+async function addFood() {
+  const input=document.getElementById("foodtxt"),button=document.getElementById("addFoodButton"),text=input.value.trim(); if(!text||foodPending)return;
+  foodPending=true;button.disabled=true;button.textContent="Estimating…";
+  let e,source="ai";
+  try{e=await requestAiFood(text);}
+  catch(_){const local=estimateFood(text);e={calories:local.cal,protein:local.protein,note:""};source="local";toast("Secure food estimate unavailable · used local estimate");}
+  D.foods.unshift({id:uid(),name:text,cal:e.calories,protein:e.protein,estimateNote:e.note,estimateSource:source,date:new Date().toDateString(),dateKey:dateKey(),createdAt:isoNow()});
+  save(); input.value=""; renderFood(); renderToday(); foodPending=false;button.disabled=false;button.textContent="Estimate & add";toast(source==="ai"?"Food added · Secure AI estimate":"Food added · Local estimate");
 }
 function renderFood() {
   const box=document.getElementById("foods"), today=D.foods.filter(f=>(f.dateKey||dateKey(f.date))===dateKey());
-  box.innerHTML=today.length?today.map(f=>`<button class="card food" onclick="editFood('${f.id||D.foods.indexOf(f)}')"><div><strong>${escapeHTML(f.name)}</strong><div class="muted">${f.cal} cal · ${f.protein} g protein</div></div><span class="chevron">›</span></button>`).join(""):'<div class="empty">No food logged yet today.</div>';
+  box.innerHTML=today.length?today.map(f=>`<button class="card food" onclick="editFood('${f.id||D.foods.indexOf(f)}')"><div><strong>${escapeHTML(f.name)}</strong><div class="muted">${f.cal} cal · ${f.protein} g protein</div>${f.estimateSource?`<small>${f.estimateSource==="ai"?"Secure AI estimate":"Local estimate"}</small>`:""}</div><span class="chevron">›</span></button>`).join(""):'<div class="empty">No food logged yet today.</div>';
 }
 function editFood(id) {
   const index=D.foods.findIndex((f,i)=>(f.id||String(i))===id), f=D.foods[index]; if(!f)return;
@@ -274,12 +295,44 @@ function renderProgress(){
   renderCoverage();
 }
 
+function recordsOnDate(key){
+  const foods=D.foods.filter(f=>(f.dateKey||dateKey(f.date))===key);
+  const workouts=D.workouts.filter(w=>dateKey(w.completedAt||w.date)===key);
+  const weights=D.weights.filter(w=>(w.dateKey||dateKey(w.date))===key);
+  return {foods,workouts,weights};
+}
+function renderCalendar(){
+  const title=document.getElementById("calendarTitle"),grid=document.getElementById("calendarGrid");if(!title||!grid)return;
+  title.textContent=calendarCursor.toLocaleDateString(undefined,{month:"long",year:"numeric"});
+  const year=calendarCursor.getFullYear(),month=calendarCursor.getMonth(),firstDay=new Date(year,month,1).getDay(),days=new Date(year,month+1,0).getDate();
+  const cells=[];
+  for(let i=0;i<firstDay;i++)cells.push('<span class="calendar-blank"></span>');
+  for(let dayNumber=1;dayNumber<=days;dayNumber++){
+    const key=dateKey(new Date(year,month,dayNumber)),data=recordsOnDate(key),today=key===dateKey(),selected=key===selectedCalendarDate;
+    const dots=`${data.foods.length?'<i class="food-dot"></i>':''}${data.workouts.length?'<i class="workout-dot"></i>':''}${data.weights.length?'<i class="weight-dot"></i>':''}`;
+    cells.push(`<button class="calendar-day ${today?"today":""} ${selected?"selected":""}" onclick="selectCalendarDate('${key}')"><b>${dayNumber}</b><span class="calendar-dots">${dots}</span></button>`);
+  }
+  grid.innerHTML=cells.join("");renderCalendarDetail();
+}
+function changeCalendarMonth(delta){calendarCursor=new Date(calendarCursor.getFullYear(),calendarCursor.getMonth()+delta,1);selectedCalendarDate=dateKey(calendarCursor);renderCalendar();}
+function selectCalendarDate(key){selectedCalendarDate=key;renderCalendar();}
+function renderCalendarDetail(){
+  const box=document.getElementById("calendarDetail");if(!box)return;
+  const data=recordsOnDate(selectedCalendarDate),date=new Date(`${selectedCalendarDate}T12:00:00`),label=date.toLocaleDateString(undefined,{weekday:"long",month:"long",day:"numeric",year:"numeric"});
+  const calories=data.foods.reduce((sum,f)=>sum+(Number(f.cal)||0),0),protein=data.foods.reduce((sum,f)=>sum+(Number(f.protein)||0),0);
+  const foodList=data.foods.length?data.foods.slice(0,8).map(f=>`<div class="history-line"><span>${escapeHTML(f.name)}</span><b>${f.cal} cal · ${f.protein} g</b></div>`).join(""):"<p class=\"muted compact\">No food logged.</p>";
+  const workoutList=data.workouts.length?data.workouts.map(w=>`<div class="calendar-workout"><strong>${escapeHTML(w.day)} workout</strong><span>${(w.exercises||[]).reduce((sum,e)=>sum+(e.sets||[]).length,0)} sets · ${(w.exercises||[]).map(e=>escapeHTML(e.name)).slice(0,3).join(", ")}${(w.exercises||[]).length>3?"…":""}</span></div>`).join(""):"<p class=\"muted compact\">No workout logged.</p>";
+  const weightList=data.weights.length?data.weights.map(w=>`<span class="pill">${escapeHTML(w.value)} lb</span>`).join(" "):"<span class=\"muted\">No weigh-in</span>";
+  box.innerHTML=`<div class="card-head"><h2>${label}</h2><span class="pill">${calories} cal · ${protein} g</span></div><div class="calendar-detail-section"><h3>Food</h3>${foodList}</div><div class="calendar-detail-section"><h3>Training</h3>${workoutList}</div><div class="calendar-detail-section"><h3>Bodyweight</h3><div>${weightList}</div></div>`;
+}
+
 function generateLocalCoachResponse(message,appState=D){
   const q=message.toLowerCase(),t=totals();
   if(/shoulder|pain|hurt|discomfort/.test(q))return "Joint pain is different from muscle fatigue. Stop the painful movement and use a comfortable, stable alternative. If pain persists or affects daily activity, get it assessed rather than training through it.";
   if(/eat|food|protein|calorie|tonight/.test(q))return nutritionMessage();
   if(/coverage|muscle/.test(q)){const scores=muscleCoverage("week"),rank=Object.entries(scores).sort((a,b)=>a[1].score-b[1].score),low=rank.filter(x=>x[1].score>0).slice(0,2).map(x=>x[0]);return D.workouts.length?`Your current 7-day coverage is lowest for ${low.join(" and ")||"muscles without recent work"}. A low score alone is not a reason to add sets; finish your normal rotation first.`:"Log a workout first and I’ll estimate muscle coverage from completed sets and RIR.";}
   if(/rest|timer|between sets/.test(q)){const recent=D.restHistory.slice(0,12);if(!recent.length)return "Start with 60 seconds for smaller isolations, 75 seconds for moderate isolations, and 90 seconds for demanding compounds. Adjust based on repeated performance, not one set.";const avg=Math.round(recent.reduce((a,r)=>a+r.actualSeconds,0)/recent.length);return `Your recent average actual rest is about ${avg} seconds. Keep it if reps and RIR stay reasonably stable across sets.`;}
+  if(/schedule|class|homework|study|plan my week|workout time/.test(q)){const s=appState.schedule||SCHEDULE_DEFAULTS;if(!s.weeklySchedule)return "Add your weekly class and work commitments in Settings → Weekly planner. Include homework needs, and I can help protect study blocks while placing your workouts.";return `Your saved plan calls for ${s.workoutsPerWeek} workout${s.workoutsPerWeek===1?"":"s"} of about ${s.workoutDurationMinutes} minutes. Keep class and deadline-heavy homework blocks fixed first, then use the clearest remaining windows for Push, Pull, and Legs. Secure AI can read the exact times in your saved schedule and lay out the week.`;}
   if(/increase|weight|press|progress/.test(q)){const w=D.workouts[0];if(!w)return "Log at least one workout so I can compare reps, load, and RIR.";const candidates=(w.exercises||[]).map(e=>({e,text:progressionText({name:e.name,base:e.baseName,range:e.range,sets:e.plannedSets||e.sets.length},{exercise:e})}));return candidates[0]?.text||"Keep using double progression and avoid changing load from one unusual set.";}
   if(/next workout|focus/.test(q)){const next=day==="PUSH"?"PULL":day==="PULL"?"LEGS":"PUSH";return `Your next session in the rotation is ${next}. Focus on clean reps, recording RIR, and beating prior performance without forcing failure on heavy compounds.`;}
   if(/hate|don't like|swap/.test(q))return "Use the Swap button on that exercise and choose “Don't like it.” I’ll preserve the movement’s purpose, and repeated swaps can support a permanent replacement.";
@@ -297,7 +350,8 @@ function buildCoachContext(){
     recentRest:D.restHistory.slice(0,20).map(r=>({exercise:r.exercise,actualSeconds:r.actualSeconds,recommendedSeconds:r.recommendedSeconds})),
     recentSwaps:D.swaps.slice(0,12).map(s=>({from:s.from||s.original,to:s.to||s.replacement,reason:s.reason,permanent:!!s.permanent})),
     recentConversation:D.coachMessages.slice(-8).map(m=>({role:m.role,text:m.text})),
-    currentWorkoutDay:day
+    currentWorkoutDay:day,
+    schedule:{weeklySchedule:D.schedule.weeklySchedule,homeworkNeeds:D.schedule.homeworkNeeds,workoutsPerWeek:D.schedule.workoutsPerWeek,workoutDurationMinutes:D.schedule.workoutDurationMinutes,timezone:Intl.DateTimeFormat().resolvedOptions().timeZone||""}
   };
 }
 async function requestAiCoach(message){
@@ -311,6 +365,7 @@ async function requestAiCoach(message){
   }finally{clearTimeout(timeout);}
 }
 function renderCoach(){
+  renderCoachStatus();
   const box=document.getElementById("coachMessages");
   const messages=D.coachMessages.length?D.coachMessages:[{role:"coach",text:"Ask me about your next workout, progression, food, rest, swaps, or muscle coverage."}];
   box.innerHTML=messages.slice(-40).map(m=>`<div class="bubble ${m.role==="user"?"user":"coach"}">${escapeHTML(m.text)}${m.role==="coach"?`<small>${m.source==="ai"?"Secure AI":"Local"}</small>`:""}</div>`).join("")+(coachPending?'<div class="bubble coach thinking">Thinking…</div>':"");box.scrollTop=box.scrollHeight;
@@ -319,11 +374,24 @@ async function askCoach(text){
   text=String(text||"").trim();if(!text||coachPending)return;
   D.coachMessages.push({id:uid(),role:"user",text,date:isoNow()});save();coachPending=true;renderCoach();
   let reply,source="ai";
-  try{reply=await requestAiCoach(text);}
-  catch(_){reply=generateLocalCoachResponse(text,D);source="local";toast("Secure Coach unavailable · used local guidance");}
+  try{reply=await requestAiCoach(text);coachConnectionState="connected";localStorage.setItem("gainlog-coach-status","connected");}
+  catch(_){reply=generateLocalCoachResponse(text,D);source="local";coachConnectionState="local";localStorage.setItem("gainlog-coach-status","local");toast("Secure Coach unavailable · used local guidance");}
   D.coachMessages.push({id:uid(),role:"coach",text:reply,source,date:isoNow()});coachPending=false;save();renderCoach();
 }
 function sendCoachMessage(){const input=document.getElementById("coachInput"),text=input.value.trim();if(!text)return;input.value="";askCoach(text);}
+function renderCoachStatus(){const el=document.getElementById("coachConnectionStatus");if(!el)return;el.textContent=coachConnectionState==="connected"?"Secure AI connected":coachConnectionState==="local"?"Local fallback":"Secure AI ready";el.classList.toggle("connected",coachConnectionState==="connected");el.classList.toggle("local",coachConnectionState==="local");}
+
+function renderScheduleSettings(){
+  const fields={weeklySchedule:D.schedule.weeklySchedule,homeworkNeeds:D.schedule.homeworkNeeds,scheduleWorkoutCount:D.schedule.workoutsPerWeek,scheduleWorkoutLength:D.schedule.workoutDurationMinutes};
+  Object.entries(fields).forEach(([id,value])=>{const el=document.getElementById(id);if(el)el.value=value??"";});
+}
+function saveSchedule(showToast=true){
+  const weeklySchedule=document.getElementById("weeklySchedule").value.trim(),homeworkNeeds=document.getElementById("homeworkNeeds").value.trim();
+  const workoutsPerWeek=Math.min(6,Math.max(1,Math.round(number(document.getElementById("scheduleWorkoutCount").value)||3)));
+  const workoutDurationMinutes=Math.min(150,Math.max(30,Math.round(number(document.getElementById("scheduleWorkoutLength").value)||60)));
+  D.schedule={weeklySchedule,homeworkNeeds,workoutsPerWeek,workoutDurationMinutes,updatedAt:isoNow()};save();renderScheduleSettings();if(showToast)toast("Weekly schedule saved");return weeklySchedule;
+}
+function planMyWeek(){const hasSchedule=saveSchedule(false);if(!hasSchedule)return toast("Add your class or work schedule first");go("coachScreen");askCoach("Plan my workout and homework times this week using my saved schedule. Give me a simple day-by-day plan with specific realistic time windows, protect my classes and homework, and keep enough recovery between Push, Pull, and Legs.");}
 
 function openModal(html){document.getElementById("modalSheet").innerHTML=html;document.getElementById("modal").classList.remove("hidden");document.body.classList.add("modal-open");}
 function closeModal(){document.getElementById("modal").classList.add("hidden");document.body.classList.remove("modal-open");pendingSwap=null;}
@@ -375,7 +443,7 @@ function checkScheduledNotifications(){
   if(D.notifications.bodyweight&&[1,3,5].includes(weekday)&&timeReached(now,D.notifications.bodyweightTime)){const logged=D.weights.some(w=>(w.dateKey||dateKey(w.date))===dateKey());if(!logged)sendReminderOnce("bodyweight","Morning weigh-in","Log a quick morning weight so GainLog can track the weekly trend.");}
 }
 
-function renderAll(){renderDays();renderWorkout();renderFood();renderToday();renderProgress();renderCoach();renderRest();renderNotificationSettings();}
+function renderAll(){renderDays();renderWorkout();renderFood();renderToday();renderProgress();renderCalendar();renderCoach();renderRest();renderNotificationSettings();renderScheduleSettings();}
 renderAll();go("today");
 setInterval(checkScheduledNotifications,60000);
 document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")checkScheduledNotifications();});
