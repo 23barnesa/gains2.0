@@ -1,5 +1,5 @@
-const CACHE = "gainlog-v2.1.1";
-const SHELL = ["./","./index.html","./styles.css?v=2.1.1","./app.js?v=2.1.1","./manifest.webmanifest"];
+const CACHE = "gainlog-v2.2.0";
+const SHELL = ["./","./index.html","./styles.css?v=2.2.0","./app.js?v=2.2.0","./manifest.webmanifest"];
 
 self.addEventListener("install", event => {
   event.waitUntil(
@@ -46,6 +46,18 @@ self.addEventListener("fetch", event => {
         return response;
       }).catch(() => cached);
       return cached || fresh;
+    })
+  );
+});
+
+self.addEventListener("notificationclick", event => {
+  event.notification.close();
+  event.waitUntil(
+    clients.matchAll({type:"window",includeUncontrolled:true}).then(clientList => {
+      for(const client of clientList){
+        if("focus" in client)return client.focus();
+      }
+      return clients.openWindow ? clients.openWindow("./") : undefined;
     })
   );
 });

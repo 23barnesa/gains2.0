@@ -1,4 +1,4 @@
-const APP_VERSION = 3;
+const APP_VERSION = 4;
 const TARGETS = { calories: 2750, protein: 155 };
 const PROGRAM = {
   PUSH: [
@@ -41,14 +41,16 @@ const EXERCISES = {
   "Calf Raise": { rest:60, muscles:{"Calves":1}, swaps:["Seated Calf Raise","Leg-Press Calf Raise","Standing Calf Machine"] }
 };
 const MUSCLES = ["Upper chest","Mid/lower chest","Front delts","Side delts","Rear delts","Lats","Upper/mid back","Biceps","Triceps","Quads","Hamstrings","Glutes","Calves"];
-const DEFAULTS = { version:APP_VERSION, foods:[], weights:[], workouts:[], swaps:[], preferences:{}, coachMessages:[], earlyEndReasons:[], programOverrides:{}, restHistory:[], restPreferences:{}, workoutDraft:null };
+const NOTIFICATION_DEFAULTS = { enabled:false, restComplete:true, workout:true, workoutTime:"11:00", nutrition:true, nutritionTime:"20:00", bodyweight:true, bodyweightTime:"08:00" };
+const DEFAULTS = { version:APP_VERSION, foods:[], weights:[], workouts:[], swaps:[], preferences:{}, coachMessages:[], earlyEndReasons:[], programOverrides:{}, restHistory:[], restPreferences:{}, notificationHistory:[], notifications:{...NOTIFICATION_DEFAULTS}, workoutDraft:null };
 
 function loadData() {
   let stored = {};
   try { stored = JSON.parse(localStorage.getItem("gainlog")) || {}; } catch (_) {}
   const merged = {...DEFAULTS, ...stored};
-  ["foods","weights","workouts","swaps","coachMessages","earlyEndReasons","restHistory"].forEach(k => { if (!Array.isArray(merged[k])) merged[k] = []; });
+  ["foods","weights","workouts","swaps","coachMessages","earlyEndReasons","restHistory","notificationHistory"].forEach(k => { if (!Array.isArray(merged[k])) merged[k] = []; });
   ["preferences","programOverrides","restPreferences"].forEach(k => { if (!merged[k] || typeof merged[k] !== "object" || Array.isArray(merged[k])) merged[k] = {}; });
+  merged.notifications={...NOTIFICATION_DEFAULTS,...(stored.notifications&&typeof stored.notifications==="object"?stored.notifications:{})};
   merged.version = APP_VERSION;
   return merged;
 }
@@ -193,7 +195,7 @@ function renderRest(){
   if(!activeRest)return el.classList.add("hidden");
   if(!restInterval)restInterval=setInterval(renderRest,500);
   const left=Math.max(0,Math.ceil((activeRest.endAt-Date.now())/1000));el.classList.remove("hidden");document.getElementById("restClock").textContent=`${Math.floor(left/60)}:${String(left%60).padStart(2,"0")}`;document.getElementById("restExercise").textContent=activeRest.exercise;
-  if(left===0&&!activeRest.notified){activeRest.notified=true;localStorage.setItem("gainlog-active-rest",JSON.stringify(activeRest));if(navigator.vibrate)navigator.vibrate([100,80,100]);try{new Audio("data:audio/wav;base64,UklGRl9vT19teleVQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YU").play();}catch(_){}toast("Rest complete");}
+  if(left===0&&!activeRest.notified){activeRest.notified=true;localStorage.setItem("gainlog-active-rest",JSON.stringify(activeRest));if(navigator.vibrate)navigator.vibrate([100,80,100]);try{new Audio("data:audio/wav;base64,UklGRl9vT19teleVQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YU").play().catch(()=>{});}catch(_){}if(D.notifications.restComplete)showGainLogNotification("Rest complete",`${activeRest.exercise}: your next set is ready.`,"gainlog-rest");toast("Rest complete");}
 }
 function addRest(seconds){if(!activeRest)return;activeRest.endAt+=seconds*1000;activeRest.notified=false;localStorage.setItem("gainlog-active-rest",JSON.stringify(activeRest));renderRest();}
 function skipRest(){finishActiveRest(true);}
@@ -300,8 +302,51 @@ function restoreBackup(event){
 }
 function confirmRestore(){localStorage.setItem("gainlog",JSON.stringify(window.pendingRestore));D=loadData();save();day=D.workoutDraft?.day||"PUSH";closeModal();renderAll();toast("Backup restored");}
 
-function renderAll(){renderDays();renderWorkout();renderFood();renderToday();renderProgress();renderCoach();renderRest();}
+function notificationsSupported(){return "Notification" in window&&"serviceWorker" in navigator;}
+function renderNotificationSettings(){
+  const supported=notificationsSupported(),permission=supported?Notification.permission:"unsupported";
+  const status=document.getElementById("notificationStatus"),help=document.getElementById("notificationHelp"),button=document.getElementById("enableNotifications");
+  status.textContent=permission==="granted"?"Enabled":permission==="denied"?"Blocked":permission==="unsupported"?"Unavailable":"Not enabled";
+  status.classList.toggle("warning",permission==="denied"||permission==="unsupported");
+  button.classList.toggle("hidden",(permission==="granted"&&D.notifications.enabled)||permission==="unsupported");
+  button.textContent=permission==="denied"?"Open iPhone Settings to allow notifications":permission==="granted"?"Turn notifications on":"Enable notifications";
+  help.textContent=permission==="unsupported"?"Open GainLog from your iPhone Home Screen to enable notifications.":permission==="denied"?"Notifications are blocked. Allow GainLog in iPhone Settings > Notifications.":"Alerts stay on this device and never expose your workout data.";
+  const values={notifyRest:D.notifications.restComplete,notifyWorkout:D.notifications.workout,notifyNutrition:D.notifications.nutrition,notifyWeight:D.notifications.bodyweight,workoutTime:D.notifications.workoutTime,nutritionTime:D.notifications.nutritionTime,weightTime:D.notifications.bodyweightTime};
+  Object.entries(values).forEach(([id,value])=>{const el=document.getElementById(id);if(!el)return;if(el.type==="checkbox")el.checked=!!value;else el.value=value;});
+}
+async function enableNotifications(){
+  if(!notificationsSupported())return toast("Open the installed Home Screen app to enable alerts");
+  if(Notification.permission==="denied"){toast("Allow GainLog in iPhone Settings > Notifications");return;}
+  const permission=Notification.permission==="granted"?"granted":await Notification.requestPermission();
+  D.notifications.enabled=permission==="granted";save();renderNotificationSettings();
+  if(permission==="granted"){await showGainLogNotification("GainLog notifications are on","Rest and training reminders are ready.","gainlog-enabled");toast("Notifications enabled");}
+  else toast("Notifications were not enabled");
+}
+function updateNotificationSetting(key,value){D.notifications[key]=value;if(value===true&&notificationsSupported()&&Notification.permission==="granted")D.notifications.enabled=true;save();renderNotificationSettings();checkScheduledNotifications();}
+async function showGainLogNotification(title,body,tag){
+  if(!notificationsSupported()||!D.notifications.enabled||Notification.permission!=="granted")return false;
+  try{const registration=await navigator.serviceWorker.ready;await registration.showNotification(title,{body,tag,data:{url:"./"},renotify:true});return true;}catch(_){return false;}
+}
+function reminderSent(type,today){return D.notificationHistory.some(n=>n.type===type&&n.dateKey===today);}
+function markReminder(type,today){D.notificationHistory.unshift({id:uid(),type,dateKey:today,sentAt:isoNow()});D.notificationHistory=D.notificationHistory.slice(0,90);save();}
+function timeReached(now,time){const [h,m]=String(time||"00:00").split(":").map(Number);return now.getHours()*60+now.getMinutes()>=h*60+m;}
+async function sendReminderOnce(type,title,body){
+  const today=dateKey();if(reminderSent(type,today))return;
+  if(await showGainLogNotification(title,body,`gainlog-${type}-${today}`))markReminder(type,today);
+}
+function checkScheduledNotifications(){
+  if(!notificationsSupported()||!D.notifications.enabled||Notification.permission!=="granted")return;
+  const now=new Date(),weekday=now.getDay();
+  if(D.notifications.workout&&[5,6,0].includes(weekday)&&timeReached(now,D.notifications.workoutTime))sendReminderOnce("workout","Workout day","Open GainLog and start today’s planned session.");
+  if(D.notifications.nutrition&&timeReached(now,D.notifications.nutritionTime)){const t=totals(),cal=Math.max(0,TARGETS.calories-t.c),pro=Math.max(0,TARGETS.protein-t.p);if(cal>250||pro>15)sendReminderOnce("nutrition","Nutrition check",`About ${cal} calories and ${pro} g protein remain today.`);}
+  if(D.notifications.bodyweight&&[1,3,5].includes(weekday)&&timeReached(now,D.notifications.bodyweightTime)){const logged=D.weights.some(w=>(w.dateKey||dateKey(w.date))===dateKey());if(!logged)sendReminderOnce("bodyweight","Morning weigh-in","Log a quick morning weight so GainLog can track the weekly trend.");}
+}
+
+function renderAll(){renderDays();renderWorkout();renderFood();renderToday();renderProgress();renderCoach();renderRest();renderNotificationSettings();}
 renderAll();go("today");
+setInterval(checkScheduledNotifications,60000);
+document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")checkScheduledNotifications();});
+window.addEventListener("focus",checkScheduledNotifications);
 
 if("serviceWorker"in navigator){
   window.addEventListener("load",async()=>{
@@ -309,6 +354,7 @@ if("serviceWorker"in navigator){
     if(reg.waiting)showUpdate(reg.waiting);
     reg.addEventListener("updatefound",()=>{const worker=reg.installing;worker?.addEventListener("statechange",()=>{if(worker.state==="installed"&&navigator.serviceWorker.controller)showUpdate(worker);});});
     navigator.serviceWorker.addEventListener("controllerchange",()=>location.reload());
+    checkScheduledNotifications();
   });
 }
 function showUpdate(worker){waitingWorker=worker;document.getElementById("updateButton").classList.remove("hidden");toast("A GainLog update is ready");}

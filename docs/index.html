@@ -9,7 +9,7 @@
   <meta name="apple-mobile-web-app-title" content="GainLog">
   <title>GainLog</title>
   <link rel="manifest" href="./manifest.webmanifest">
-  <link rel="stylesheet" href="./styles.css?v=2.1.1">
+  <link rel="stylesheet" href="./styles.css?v=2.2.0">
 </head>
 <body>
   <header><b>GAINLOG</b><button class="ghost small" onclick="go('settings')" aria-label="Settings">Settings</button></header>
@@ -49,9 +49,21 @@
     </section>
     <section id="settings">
       <div class="page-title"><h1>Settings</h1></div>
+      <div class="card">
+        <div class="card-head"><h2>Notifications</h2><span id="notificationStatus" class="pill">Not enabled</span></div>
+        <p id="notificationHelp" class="muted compact">Enable alerts from your installed GainLog app.</p>
+        <button id="enableNotifications" class="primary wide" onclick="enableNotifications()">Enable notifications</button>
+        <div class="reminder-list">
+          <label class="reminder-row"><span><strong>Rest timer finished</strong><small>Alert when your next set is ready</small></span><input id="notifyRest" type="checkbox" onchange="updateNotificationSetting('restComplete',this.checked)"></label>
+          <label class="reminder-row"><span><strong>Workout days</strong><small>Friday, Saturday, and Sunday</small></span><span class="reminder-control"><input id="notifyWorkout" type="checkbox" onchange="updateNotificationSetting('workout',this.checked)"><input id="workoutTime" type="time" onchange="updateNotificationSetting('workoutTime',this.value)"></span></label>
+          <label class="reminder-row"><span><strong>Food and protein</strong><small>Only alerts when a meaningful amount remains</small></span><span class="reminder-control"><input id="notifyNutrition" type="checkbox" onchange="updateNotificationSetting('nutrition',this.checked)"><input id="nutritionTime" type="time" onchange="updateNotificationSetting('nutritionTime',this.value)"></span></label>
+          <label class="reminder-row"><span><strong>Bodyweight</strong><small>Monday, Wednesday, and Friday</small></span><span class="reminder-control"><input id="notifyWeight" type="checkbox" onchange="updateNotificationSetting('bodyweight',this.checked)"><input id="weightTime" type="time" onchange="updateNotificationSetting('bodyweightTime',this.value)"></span></label>
+        </div>
+        <small>Scheduled reminders run while GainLog is active or resumes. Fully closed-app delivery will require the future secure push backend.</small>
+      </div>
       <div class="card"><h2>Data</h2><p class="muted">Your data stays on this device unless you export it.</p><div class="button-row"><button onclick="backup()">Backup JSON</button><button onclick="document.getElementById('restoreFile').click()">Restore JSON</button></div><input id="restoreFile" class="hidden" type="file" accept="application/json" onchange="restoreBackup(event)"></div>
       <div class="card"><h2>Training guardrails</h2><p>Compounds: usually 1–2 RIR. Isolations: usually 0–2 RIR. Stop or swap any movement causing joint pain.</p></div>
-      <div class="card"><h2>App</h2><p class="muted">GainLog 2.1 · local-first PWA</p><button id="updateButton" class="hidden" onclick="applyUpdate()">Install update</button></div>
+      <div class="card"><h2>App</h2><p class="muted">GainLog 2.2 · local-first PWA</p><button id="updateButton" class="hidden" onclick="applyUpdate()">Install update</button></div>
     </section>
   </main>
   <div id="restTimer" class="rest-timer hidden"><div><span>REST</span><strong id="restClock">1:00</strong><small id="restExercise"></small></div><div class="timer-actions"><button onclick="addRest(15)">+15</button><button onclick="addRest(30)">+30</button><button onclick="skipRest()">Skip</button></div></div>
@@ -60,6 +72,6 @@
   <nav>
     <button data-screen="today" onclick="go('today')"><b>⌂</b><span>Today</span></button><button data-screen="food" onclick="go('food')"><b>＋</b><span>Food</span></button><button data-screen="workout" onclick="go('workout')"><b>▣</b><span>Workout</span></button><button data-screen="progress" onclick="go('progress')"><b>↗</b><span>Progress</span></button><button data-screen="coachScreen" onclick="go('coachScreen')"><b>✦</b><span>Coach</span></button>
   </nav>
-  <script src="./app.js?v=2.1.1"></script>
+  <script src="./app.js?v=2.2.0"></script>
 </body>
 </html>

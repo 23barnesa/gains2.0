@@ -85,6 +85,18 @@ small{display:block;color:var(--muted);margin-top:8px;line-height:1.3}
 .score-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .score-grid span{background:#0d1217;padding:11px;border-radius:11px;color:var(--muted);font-size:12px}
 .score-grid b{display:block;color:#fff;margin-top:4px}
+.pill.warning{background:#392a20;color:#ffc58f}
+.reminder-list{display:grid;margin:14px 0 8px;border-top:1px solid #ffffff0b}
+.reminder-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 0;border-bottom:1px solid #ffffff0b}
+.reminder-row>span:first-child{min-width:0}
+.reminder-row strong{display:block;font-size:14px}
+.reminder-row small{margin-top:3px;font-size:11px}
+.reminder-control{display:flex;align-items:center;justify-content:flex-end;gap:8px;flex:0 0 auto}
+.reminder-row input[type="checkbox"]{appearance:none;-webkit-appearance:none;width:46px;height:27px;min-height:27px;margin:0;padding:2px;border:0;border-radius:99px;background:#39424c;position:relative;transition:.18s}
+.reminder-row input[type="checkbox"]::after{content:"";position:absolute;width:23px;height:23px;left:2px;top:2px;border-radius:50%;background:#fff;transition:.18s}
+.reminder-row input[type="checkbox"]:checked{background:var(--accent)}
+.reminder-row input[type="checkbox"]:checked::after{transform:translateX(19px);background:#0a150b}
+.reminder-row input[type="time"]{width:91px;min-height:36px;margin:0;padding:7px 5px;font-size:13px}
 .history-line{display:flex;justify-content:space-between;border-bottom:1px solid #ffffff0b;padding:7px 0;margin:0}
 .workout-history{display:flex;justify-content:space-between;align-items:center;border-top:1px solid #ffffff0b;padding:11px 0}
 .workout-history small{margin:2px 0 0}
