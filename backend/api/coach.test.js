@@ -67,3 +67,13 @@ test("returns a supported structured split recommendation", async () => {
   assert.deepEqual(recommendation, { splitId: "upper_lower", reason: "Four available days support twice-weekly muscle frequency with manageable recovery." });
   assert.deepEqual(request.text.format.schema.properties.splitId.enum, ["ppl", "full_body", "upper_lower", "hybrid"]);
 });
+
+test("keeps PPL for three consecutive training days", async () => {
+  process.env.OPENAI_API_KEY = "test-only";
+  const recommendation = await createSplitRecommendation({ schedule: { weeklySchedule: "Friday, Saturday, and Sunday available", workoutsPerWeek: 3 } }, async () => ({
+    ok: true,
+    json: async () => ({ output_text: JSON.stringify({ splitId: "full_body", reason: "Three sessions." }) })
+  }));
+  assert.equal(recommendation.splitId, "ppl");
+  assert.match(recommendation.reason, /back-to-back/);
+});
