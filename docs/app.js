@@ -1,4 +1,4 @@
-const APP_VERSION = 6;
+const APP_VERSION = 7;
 const COACH_API_URL = "https://gainlog-coach-23barnesa.vercel.app/api/coach";
 const TARGETS = { calories: 2750, protein: 155 };
 const PROGRAM = {
@@ -19,6 +19,22 @@ const PROGRAM = {
     ["Hip Thrust / Glute Drive",2,"8–12"],["Calf Raise",4,"8–15"]
   ]
 };
+const TRAINING_PROGRAMS = {
+  ppl: { name:"Push / Pull / Legs", days:PROGRAM },
+  full_body: { name:"Full Body A / B / C", days:{
+    "FULL A":[["Hammer Strength Incline Press",3,"6–10"],["Neutral-Grip Lat Pulldown",3,"6–10"],["Hack Squat / Leg Press",3,"6–10"],["Seated Leg Curl",3,"8–12"],["Cable Lateral Raise",3,"12–20"],["Rope Triceps Pushdown",2,"8–15"],["Incline DB Curl",2,"8–12"]],
+    "FULL B":[["Hammer Strength Decline Press",3,"8–12"],["Chest-Supported Row",3,"6–10"],["Leg Extension",3,"10–15"],["Hip Thrust / Glute Drive",2,"8–12"],["Reverse Pec Deck",3,"12–20"],["Overhead Cable Triceps Extension",2,"10–15"],["Hammer Curl",2,"10–15"],["Calf Raise",3,"8–15"]],
+    "FULL C":[["Hammer Strength Incline Press",3,"6–10"],["Single-Arm Cable Lat Pulldown",3,"10–15"],["Hack Squat / Leg Press",3,"6–10"],["Lying Leg Curl",3,"10–15"],["Cable Lateral Raise",3,"12–20"],["Cable Fly",2,"10–15"],["Incline DB Curl",2,"8–12"],["Calf Raise",3,"8–15"]]
+  }},
+  upper_lower: { name:"Upper / Lower", days:{
+    "UPPER A":[["Hammer Strength Incline Press",3,"6–10"],["Neutral-Grip Lat Pulldown",3,"6–10"],["Chest-Supported Row",3,"6–10"],["Cable Fly",2,"10–15"],["Cable Lateral Raise",3,"12–20"],["Rope Triceps Pushdown",2,"8–15"],["Incline DB Curl",2,"8–12"]],
+    "LOWER A":[["Hack Squat / Leg Press",3,"6–10"],["Leg Extension",3,"10–15"],["Seated Leg Curl",4,"8–12"],["Hip Thrust / Glute Drive",2,"8–12"],["Calf Raise",4,"8–15"]],
+    "UPPER B":[["Hammer Strength Decline Press",3,"8–12"],["Single-Arm Cable Lat Pulldown",3,"10–15"],["Chest-Supported Row",3,"6–10"],["Reverse Pec Deck",3,"12–20"],["Cable Lateral Raise",3,"12–20"],["Overhead Cable Triceps Extension",2,"10–15"],["Hammer Curl",2,"10–15"]],
+    "LOWER B":[["Hack Squat / Leg Press",3,"6–10"],["Leg Extension",3,"10–15"],["Lying Leg Curl",3,"10–15"],["Seated Leg Curl",2,"8–12"],["Hip Thrust / Glute Drive",2,"8–12"],["Calf Raise",4,"8–15"]]
+  }},
+  hybrid: { name:"Upper / Lower + PPL", days:{} }
+};
+TRAINING_PROGRAMS.hybrid.days={"UPPER":TRAINING_PROGRAMS.upper_lower.days["UPPER A"],"LOWER":TRAINING_PROGRAMS.upper_lower.days["LOWER A"],...PROGRAM};
 
 const EXERCISES = {
   "Hammer Strength Incline Press": { rest:90, muscles:{"Upper chest":1,"Front delts":.45,"Triceps":.35}, swaps:["Incline Machine Press","Low-to-High Cable Press","Neutral-Grip Incline DB Press"] },
@@ -43,8 +59,9 @@ const EXERCISES = {
 };
 const MUSCLES = ["Upper chest","Mid/lower chest","Front delts","Side delts","Rear delts","Lats","Upper/mid back","Biceps","Triceps","Quads","Hamstrings","Glutes","Calves"];
 const NOTIFICATION_DEFAULTS = { enabled:false, restComplete:true, workout:true, workoutTime:"11:00", nutrition:true, nutritionTime:"20:00", bodyweight:true, bodyweightTime:"08:00" };
-const SCHEDULE_DEFAULTS = { weeklySchedule:"", homeworkNeeds:"", workoutsPerWeek:3, workoutDurationMinutes:60, updatedAt:null };
-const DEFAULTS = { version:APP_VERSION, foods:[], weights:[], workouts:[], swaps:[], preferences:{}, coachMessages:[], earlyEndReasons:[], programOverrides:{}, restHistory:[], restPreferences:{}, notificationHistory:[], notifications:{...NOTIFICATION_DEFAULTS}, schedule:{...SCHEDULE_DEFAULTS}, workoutDraft:null };
+const SCHEDULE_DEFAULTS = { weeklySchedule:"", homeworkNeeds:"", workoutRequests:"", workoutsPerWeek:3, workoutDurationMinutes:60, updatedAt:null };
+const TRAINING_PLAN_DEFAULTS = { mode:"coach", splitId:"ppl", reason:"Your original Push / Pull / Legs plan is preserved until Coach optimization is requested.", updatedAt:null };
+const DEFAULTS = { version:APP_VERSION, foods:[], weights:[], workouts:[], swaps:[], preferences:{}, coachMessages:[], earlyEndReasons:[], programOverrides:{}, restHistory:[], restPreferences:{}, notificationHistory:[], notifications:{...NOTIFICATION_DEFAULTS}, schedule:{...SCHEDULE_DEFAULTS}, trainingPlan:{...TRAINING_PLAN_DEFAULTS}, workoutDraft:null };
 
 function loadData() {
   let stored = {};
@@ -54,15 +71,18 @@ function loadData() {
   ["preferences","programOverrides","restPreferences"].forEach(k => { if (!merged[k] || typeof merged[k] !== "object" || Array.isArray(merged[k])) merged[k] = {}; });
   merged.notifications={...NOTIFICATION_DEFAULTS,...(stored.notifications&&typeof stored.notifications==="object"?stored.notifications:{})};
   merged.schedule={...SCHEDULE_DEFAULTS,...(stored.schedule&&typeof stored.schedule==="object"&&!Array.isArray(stored.schedule)?stored.schedule:{})};
+  merged.trainingPlan={...TRAINING_PLAN_DEFAULTS,...(stored.trainingPlan&&typeof stored.trainingPlan==="object"&&!Array.isArray(stored.trainingPlan)?stored.trainingPlan:{})};
+  if(!TRAINING_PROGRAMS[merged.trainingPlan.splitId])merged.trainingPlan.splitId="ppl";
   merged.version = APP_VERSION;
   return merged;
 }
 let D = loadData();
-let day = D.workoutDraft?.day || "PUSH";
+let day = D.workoutDraft?.day || Object.keys(TRAINING_PROGRAMS[D.trainingPlan.splitId].days)[0];
 let coverageRange = "last";
 let activeRest = null;
 let restInterval = null;
 let pendingSwap = null;
+let pendingSplit = null;
 let waitingWorker = null;
 let coachPending = false;
 let foodPending = false;
@@ -159,12 +179,14 @@ function deleteFood(i){D.foods.splice(i,1);save();closeModal();renderFood();rend
 function addWeight(){const input=document.getElementById("wt"),v=number(input.value);if(!v||v<50||v>600)return toast("Enter a valid weight");D.weights.unshift({id:uid(),value:v,date:new Date().toLocaleDateString(),dateKey:dateKey(),createdAt:isoNow()});save();input.value="";renderProgress();toast("Weight saved");}
 
 function currentProgram() {
-  return PROGRAM[day].map((e,i)=>{
+  const plan=TRAINING_PROGRAMS[D.trainingPlan.splitId]?.days||PROGRAM;
+  return (plan[day]||Object.values(plan)[0]).map((e,i)=>{
     const override=D.programOverrides[day]?.[i];
     return {base:e[0],name:override?.name||e[0],sets:e[1],range:e[2],temporary:D.workoutDraft?.swaps?.[i]||null};
   }).map(e=>({...e,name:e.temporary?.name||e.name}));
 }
-function renderDays(){document.getElementById("days").innerHTML=["PUSH","PULL","LEGS"].map(d=>`<button class="${d===day?"on":""}" onclick="selectDay('${d}')">${d}</button>`).join("");}
+function trainingDays(){return Object.keys(TRAINING_PROGRAMS[D.trainingPlan.splitId]?.days||PROGRAM);}
+function renderDays(){document.getElementById("days").innerHTML=trainingDays().map(d=>`<button class="${d===day?"on":""}" onclick="selectDay('${d}')">${d}</button>`).join("");}
 function selectDay(d){if(D.workoutDraft?.hasData&&D.workoutDraft.day!==d)return toast("Finish or discard your current workout first");day=d;ensureDraft();renderDays();renderWorkout();}
 function ensureDraft(){
   if(!D.workoutDraft||D.workoutDraft.day!==day)D.workoutDraft={id:uid(),day,startedAt:isoNow(),sets:{},swaps:{},hasData:false};
@@ -188,6 +210,7 @@ function progressionText(e,last){
 }
 function renderWorkout(){
   ensureDraft(); const box=document.getElementById("ex"), program=currentProgram();
+  const splitLabel=document.getElementById("activeSplitLabel");if(splitLabel)splitLabel.textContent=TRAINING_PROGRAMS[D.trainingPlan.splitId].name;
   document.getElementById("discardWorkout").classList.toggle("hidden",!D.workoutDraft.hasData);
   document.getElementById("workoutHint").textContent=D.workoutDraft.hasData?"Workout in progress · saved on this device":"Log a complete set to start its rest timer.";
   box.innerHTML=program.map((e,ei)=>{
@@ -332,9 +355,9 @@ function generateLocalCoachResponse(message,appState=D){
   if(/eat|food|protein|calorie|tonight/.test(q))return nutritionMessage();
   if(/coverage|muscle/.test(q)){const scores=muscleCoverage("week"),rank=Object.entries(scores).sort((a,b)=>a[1].score-b[1].score),low=rank.filter(x=>x[1].score>0).slice(0,2).map(x=>x[0]);return D.workouts.length?`Your current 7-day coverage is lowest for ${low.join(" and ")||"muscles without recent work"}. A low score alone is not a reason to add sets; finish your normal rotation first.`:"Log a workout first and I’ll estimate muscle coverage from completed sets and RIR.";}
   if(/rest|timer|between sets/.test(q)){const recent=D.restHistory.slice(0,12);if(!recent.length)return "Start with 60 seconds for smaller isolations, 75 seconds for moderate isolations, and 90 seconds for demanding compounds. Adjust based on repeated performance, not one set.";const avg=Math.round(recent.reduce((a,r)=>a+r.actualSeconds,0)/recent.length);return `Your recent average actual rest is about ${avg} seconds. Keep it if reps and RIR stay reasonably stable across sets.`;}
-  if(/schedule|class|homework|study|plan my week|workout time/.test(q)){const s=appState.schedule||SCHEDULE_DEFAULTS;if(!s.weeklySchedule)return "Add your weekly class and work commitments in Settings → Weekly planner. Include homework needs, and I can help protect study blocks while placing your workouts.";return `Your saved plan calls for ${s.workoutsPerWeek} workout${s.workoutsPerWeek===1?"":"s"} of about ${s.workoutDurationMinutes} minutes. Keep class and deadline-heavy homework blocks fixed first, then use the clearest remaining windows for Push, Pull, and Legs. Secure AI can read the exact times in your saved schedule and lay out the week.`;}
+  if(/split|routine|program|schedule|class|homework|study|plan my week|workout time/.test(q)){const s=appState.schedule||SCHEDULE_DEFAULTS,plan=TRAINING_PROGRAMS[appState.trainingPlan?.splitId||"ppl"];if(!s.weeklySchedule)return `Your active split is ${plan.name}. Add your weekly commitments in Settings so Coach can decide whether PPL, Full Body, Upper/Lower, or the five-day hybrid fits better.`;return `Your active split is ${plan.name}. Your saved plan calls for ${s.workoutsPerWeek} workout${s.workoutsPerWeek===1?"":"s"} of about ${s.workoutDurationMinutes} minutes. Use Optimize split to compare frequency, recovery, session length, and your saved workout request before changing it.`;}
   if(/increase|weight|press|progress/.test(q)){const w=D.workouts[0];if(!w)return "Log at least one workout so I can compare reps, load, and RIR.";const candidates=(w.exercises||[]).map(e=>({e,text:progressionText({name:e.name,base:e.baseName,range:e.range,sets:e.plannedSets||e.sets.length},{exercise:e})}));return candidates[0]?.text||"Keep using double progression and avoid changing load from one unusual set.";}
-  if(/next workout|focus/.test(q)){const next=day==="PUSH"?"PULL":day==="PULL"?"LEGS":"PUSH";return `Your next session in the rotation is ${next}. Focus on clean reps, recording RIR, and beating prior performance without forcing failure on heavy compounds.`;}
+  if(/next workout|focus/.test(q)){const days=trainingDays(),next=days[(days.indexOf(day)+1)%days.length];return `Your next session in the ${TRAINING_PROGRAMS[D.trainingPlan.splitId].name} rotation is ${next}. Focus on clean reps, recording RIR, and beating prior performance without forcing failure on heavy compounds.`;}
   if(/hate|don't like|swap/.test(q))return "Use the Swap button on that exercise and choose “Don't like it.” I’ll preserve the movement’s purpose, and repeated swaps can support a permanent replacement.";
   if(/weak|low energy|tired/.test(q))return "Treat one low-energy session as an off day. Keep technique clean, avoid forced PRs, and look for a trend across sleep, food, bodyweight, and multiple workouts before changing the program.";
   return `I’m the local rules-based Coach. I can help with progression, food targets, rest, muscle coverage, exercise swaps, shoulder safety, and your next workout. ${t.c||t.p?nutritionMessage():"Start by logging a workout or today’s food."}`;
@@ -351,7 +374,8 @@ function buildCoachContext(){
     recentSwaps:D.swaps.slice(0,12).map(s=>({from:s.from||s.original,to:s.to||s.replacement,reason:s.reason,permanent:!!s.permanent})),
     recentConversation:D.coachMessages.slice(-8).map(m=>({role:m.role,text:m.text})),
     currentWorkoutDay:day,
-    schedule:{weeklySchedule:D.schedule.weeklySchedule,homeworkNeeds:D.schedule.homeworkNeeds,workoutsPerWeek:D.schedule.workoutsPerWeek,workoutDurationMinutes:D.schedule.workoutDurationMinutes,timezone:Intl.DateTimeFormat().resolvedOptions().timeZone||""}
+    schedule:{weeklySchedule:D.schedule.weeklySchedule,homeworkNeeds:D.schedule.homeworkNeeds,workoutRequests:D.schedule.workoutRequests,workoutsPerWeek:D.schedule.workoutsPerWeek,workoutDurationMinutes:D.schedule.workoutDurationMinutes,timezone:Intl.DateTimeFormat().resolvedOptions().timeZone||""},
+    trainingPlan:{mode:D.trainingPlan.mode,splitId:D.trainingPlan.splitId,splitName:TRAINING_PROGRAMS[D.trainingPlan.splitId].name,reason:D.trainingPlan.reason}
   };
 }
 async function requestAiCoach(message){
@@ -382,26 +406,54 @@ function sendCoachMessage(){const input=document.getElementById("coachInput"),te
 function renderCoachStatus(){const el=document.getElementById("coachConnectionStatus");if(!el)return;el.textContent=coachConnectionState==="connected"?"Secure AI connected":coachConnectionState==="local"?"Local fallback":"Secure AI ready";el.classList.toggle("connected",coachConnectionState==="connected");el.classList.toggle("local",coachConnectionState==="local");}
 
 function renderScheduleSettings(){
-  const fields={weeklySchedule:D.schedule.weeklySchedule,homeworkNeeds:D.schedule.homeworkNeeds,scheduleWorkoutCount:D.schedule.workoutsPerWeek,scheduleWorkoutLength:D.schedule.workoutDurationMinutes};
+  const fields={weeklySchedule:D.schedule.weeklySchedule,homeworkNeeds:D.schedule.homeworkNeeds,workoutRequests:D.schedule.workoutRequests,scheduleWorkoutCount:D.schedule.workoutsPerWeek,scheduleWorkoutLength:D.schedule.workoutDurationMinutes};
   Object.entries(fields).forEach(([id,value])=>{const el=document.getElementById(id);if(el)el.value=value??"";});
+  const mode=document.getElementById("splitMode"),choice=document.getElementById("splitChoice"),pill=document.getElementById("activeSplitPill"),reason=document.getElementById("splitReason");
+  if(mode)mode.value=D.trainingPlan.mode;if(choice)choice.value=D.trainingPlan.splitId;if(pill)pill.textContent=TRAINING_PROGRAMS[D.trainingPlan.splitId].name;if(reason)reason.textContent=D.trainingPlan.reason;
 }
 function saveSchedule(showToast=true){
-  const weeklySchedule=document.getElementById("weeklySchedule").value.trim(),homeworkNeeds=document.getElementById("homeworkNeeds").value.trim();
+  const weeklySchedule=document.getElementById("weeklySchedule").value.trim(),homeworkNeeds=document.getElementById("homeworkNeeds").value.trim(),workoutRequests=document.getElementById("workoutRequests").value.trim();
   const workoutsPerWeek=Math.min(6,Math.max(1,Math.round(number(document.getElementById("scheduleWorkoutCount").value)||3)));
   const workoutDurationMinutes=Math.min(150,Math.max(30,Math.round(number(document.getElementById("scheduleWorkoutLength").value)||60)));
-  D.schedule={weeklySchedule,homeworkNeeds,workoutsPerWeek,workoutDurationMinutes,updatedAt:isoNow()};save();renderScheduleSettings();if(showToast)toast("Weekly schedule saved");return weeklySchedule;
+  D.schedule={weeklySchedule,homeworkNeeds,workoutRequests,workoutsPerWeek,workoutDurationMinutes,updatedAt:isoNow()};save();renderScheduleSettings();if(showToast)toast("Weekly schedule saved");return weeklySchedule;
 }
-function planMyWeek(){const hasSchedule=saveSchedule(false);if(!hasSchedule)return toast("Add your class or work schedule first");go("coachScreen");askCoach("Plan my workout and homework times this week using my saved schedule. Give me a simple day-by-day plan with specific realistic time windows, protect my classes and homework, and keep enough recovery between Push, Pull, and Legs.");}
+function planMyWeek(){const hasSchedule=saveSchedule(false);if(!hasSchedule)return toast("Add your class or work schedule first");go("coachScreen");askCoach(`Plan my workout and homework times this week using my saved schedule and active ${TRAINING_PROGRAMS[D.trainingPlan.splitId].name} split. If another supported split would clearly improve recovery or muscle frequency, tell me to use Optimize split. Give specific realistic time windows and protect homework.`);}
+
+function localSplitRecommendation(){
+  const count=D.schedule.workoutsPerWeek,text=`${D.schedule.weeklySchedule} ${D.schedule.workoutRequests}`.toLowerCase();
+  let splitId=count<=3?"full_body":count===4?"upper_lower":count===5?"hybrid":"ppl";
+  if(count===3&&(/fri[^\n]*sat[^\n]*sun|consecutive|back.to.back/.test(text)))splitId="ppl";
+  const reason=splitId==="full_body"?"Full-body training raises muscle frequency when you have three or fewer well-spaced sessions.":splitId==="upper_lower"?"Four days fits Upper/Lower well: each muscle can be trained about twice weekly with manageable sessions.":splitId==="hybrid"?"Five days supports an Upper/Lower plus PPL hybrid with good frequency and flexible emphasis.":"PPL fits six sessions—or three back-to-back days—without repeatedly training the same muscles before they recover.";
+  return {splitId,reason,source:"local"};
+}
+async function requestAiSplit(){
+  const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),25000);
+  try{const response=await fetch(COACH_API_URL,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({type:"split_recommendation",context:buildCoachContext()}),signal:controller.signal});if(!response.ok)throw new Error(`Split planner returned ${response.status}`);const result=await response.json();if(!TRAINING_PROGRAMS[result.splitId])throw new Error("Unsupported split");return {...result,source:"ai"};}finally{clearTimeout(timeout);}
+}
+async function optimizeTrainingSplit(){
+  if(D.workoutDraft?.hasData)return toast("Finish or discard the current workout before changing splits");
+  saveSchedule(false);toast("Coach is comparing training splits…");
+  try{pendingSplit=await requestAiSplit();}catch(_){pendingSplit=localSplitRecommendation();}
+  const plan=TRAINING_PROGRAMS[pendingSplit.splitId];
+  openModal(`<div class="sheet-handle"></div><span class="pill">${pendingSplit.source==="ai"?"Secure AI":"Local fallback"}</span><h2>${escapeHTML(plan.name)}</h2><p>${escapeHTML(pendingSplit.reason)}</p><p class="muted compact">This changes future workout tabs only. History, previous weights, swaps, and stored data stay intact.</p><button class="primary wide" onclick="applySplitRecommendation()">Use this split</button><button class="ghost wide" onclick="closeModal()">Keep ${escapeHTML(TRAINING_PROGRAMS[D.trainingPlan.splitId].name)}</button>`);
+}
+function applyTrainingSplit(splitId,reason,mode=D.trainingPlan.mode){
+  if(!TRAINING_PROGRAMS[splitId]||D.workoutDraft?.hasData)return false;
+  D.trainingPlan={mode,splitId,reason,updatedAt:isoNow()};day=Object.keys(TRAINING_PROGRAMS[splitId].days)[0];D.workoutDraft=null;save();ensureDraft();renderDays();renderWorkout();renderScheduleSettings();return true;
+}
+function applySplitRecommendation(){if(!pendingSplit)return;const plan=TRAINING_PROGRAMS[pendingSplit.splitId];if(applyTrainingSplit(pendingSplit.splitId,pendingSplit.reason,"coach")){closeModal();toast(`${plan.name} is now active`);}}
+function setSplitMode(mode){D.trainingPlan.mode=mode==="manual"?"manual":"coach";D.trainingPlan.updatedAt=isoNow();save();renderScheduleSettings();}
+function selectTrainingSplit(splitId){if(D.workoutDraft?.hasData){renderScheduleSettings();return toast("Finish or discard the current workout first");}const plan=TRAINING_PROGRAMS[splitId];if(!plan)return;if(applyTrainingSplit(splitId,`You manually selected ${plan.name}.`,"manual"))toast(`${plan.name} is now active`);}
 
 function openModal(html){document.getElementById("modalSheet").innerHTML=html;document.getElementById("modal").classList.remove("hidden");document.body.classList.add("modal-open");}
-function closeModal(){document.getElementById("modal").classList.add("hidden");document.body.classList.remove("modal-open");pendingSwap=null;}
+function closeModal(){document.getElementById("modal").classList.add("hidden");document.body.classList.remove("modal-open");pendingSwap=null;pendingSplit=null;}
 function modalBackdrop(e){if(e.target.id==="modal")closeModal();}
 function backup(){const blob=new Blob([JSON.stringify(D,null,2)],{type:"application/json"}),url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download=`gainlog-backup-${dateKey()}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
 function restoreBackup(event){
   const file=event.target.files?.[0];if(!file)return;const reader=new FileReader();
   reader.onload=()=>{try{const parsed=JSON.parse(reader.result);if(!parsed||!Array.isArray(parsed.foods)||!Array.isArray(parsed.weights)||!Array.isArray(parsed.workouts))throw new Error();window.pendingRestore=parsed;openModal('<div class="sheet-handle"></div><h2>Restore backup?</h2><p class="muted">This replaces current device data with the selected backup. Export a backup first if needed.</p><button class="danger wide" onclick="confirmRestore()">Restore backup</button><button class="ghost wide" onclick="closeModal()">Cancel</button>');}catch(_){toast("That file is not a valid GainLog backup");}};reader.readAsText(file);event.target.value="";
 }
-function confirmRestore(){localStorage.setItem("gainlog",JSON.stringify(window.pendingRestore));D=loadData();save();day=D.workoutDraft?.day||"PUSH";closeModal();renderAll();toast("Backup restored");}
+function confirmRestore(){localStorage.setItem("gainlog",JSON.stringify(window.pendingRestore));D=loadData();save();day=D.workoutDraft?.day||Object.keys(TRAINING_PROGRAMS[D.trainingPlan.splitId].days)[0];closeModal();renderAll();toast("Backup restored");}
 
 function notificationsSupported(){return "Notification" in window&&"serviceWorker" in navigator;}
 function renderNotificationSettings(){
