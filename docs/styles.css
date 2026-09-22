@@ -40,6 +40,12 @@ progress::-webkit-progress-value{background:var(--accent);border-radius:10px}
 textarea,input{width:100%;background:#0c1116;color:#fff;border:1px solid #35414d;border-radius:12px;padding:12px;font-size:16px;min-height:44px;outline:none}
 input:focus,textarea:focus{border-color:#76c973;box-shadow:0 0 0 3px #91e58b15}
 textarea{height:90px;resize:none;margin-bottom:10px}
+.schedule-card>label,.schedule-numbers label{display:block;color:var(--muted);font-size:12px}
+.schedule-text{height:118px;margin-top:7px}
+.schedule-text.short{height:76px}
+.schedule-numbers{margin-top:5px}
+.schedule-numbers input{margin-top:7px}
+.schedule-numbers small{margin:4px 0 0}
 small{display:block;color:var(--muted);margin-top:8px;line-height:1.3}
 .inline-form,.chat-input{display:grid;grid-template-columns:1fr auto;gap:8px}
 .button-row,.button-stack{display:flex;gap:8px;flex-wrap:wrap}
@@ -86,6 +92,8 @@ small{display:block;color:var(--muted);margin-top:8px;line-height:1.3}
 .score-grid span{background:#0d1217;padding:11px;border-radius:11px;color:var(--muted);font-size:12px}
 .score-grid b{display:block;color:#fff;margin-top:4px}
 .pill.warning{background:#392a20;color:#ffc58f}
+.pill.connected{background:#243d29;color:#baf4b4}
+.pill.local{background:#392a20;color:#ffc58f}
 .reminder-list{display:grid;margin:14px 0 8px;border-top:1px solid #ffffff0b}
 .reminder-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 0;border-bottom:1px solid #ffffff0b}
 .reminder-row>span:first-child{min-width:0}
@@ -98,6 +106,23 @@ small{display:block;color:var(--muted);margin-top:8px;line-height:1.3}
 .reminder-row input[type="checkbox"]:checked::after{transform:translateX(19px);background:#0a150b}
 .reminder-row input[type="time"]{width:91px;min-height:36px;margin:0;padding:7px 5px;font-size:13px}
 .history-line{display:flex;justify-content:space-between;border-bottom:1px solid #ffffff0b;padding:7px 0;margin:0}
+.calendar-nav{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px}
+.calendar-nav h2{margin:0;text-align:center;flex:1}
+.calendar-weekdays,.calendar-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:5px}
+.calendar-weekdays{color:var(--muted);font-size:10px;text-align:center;margin-bottom:5px}
+.calendar-day,.calendar-blank{min-height:49px;border-radius:11px}
+.calendar-day{background:#0d1217;padding:7px 3px;display:flex;flex-direction:column;align-items:center;justify-content:space-between;color:#dfe5e8}
+.calendar-day b{font-size:13px}
+.calendar-day.today{border:1px solid #6fbd6c}
+.calendar-day.selected{background:#263d2b;color:var(--accent)}
+.calendar-dots{display:flex;gap:3px;min-height:7px}
+.calendar-dots i{display:block;width:5px;height:5px;border-radius:50%}
+.food-dot{background:#e6b768}.workout-dot{background:#91e58b}.weight-dot{background:#83b9ff}
+.calendar-detail{min-height:170px}
+.calendar-detail-section{margin-top:16px}
+.calendar-detail-section h3{font-size:13px;color:var(--muted);margin-bottom:6px}
+.calendar-workout{display:flex;flex-direction:column;gap:3px;border-bottom:1px solid #ffffff0b;padding:8px 0}
+.calendar-workout span{font-size:12px;color:var(--muted);line-height:1.35}
 .workout-history{display:flex;justify-content:space-between;align-items:center;border-top:1px solid #ffffff0b;padding:11px 0}
 .workout-history small{margin:2px 0 0}
 .coach-note{background:#18251c;border:1px solid #304b35;color:#c2dec5;padding:11px 13px;border-radius:13px;font-size:12px;line-height:1.4}
