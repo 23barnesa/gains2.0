@@ -1,4 +1,5 @@
 const APP_VERSION = 4;
+const COACH_API_URL = "https://gainlog-coach-23barnesa.vercel.app/api/coach";
 const TARGETS = { calories: 2750, protein: 155 };
 const PROGRAM = {
   PUSH: [
@@ -61,6 +62,7 @@ let activeRest = null;
 let restInterval = null;
 let pendingSwap = null;
 let waitingWorker = null;
+let coachPending = false;
 
 function save() { localStorage.setItem("gainlog", JSON.stringify(D)); }
 function isoNow() { return new Date().toISOString(); }
@@ -284,12 +286,43 @@ function generateLocalCoachResponse(message,appState=D){
   if(/weak|low energy|tired/.test(q))return "Treat one low-energy session as an off day. Keep technique clean, avoid forced PRs, and look for a trend across sleep, food, bodyweight, and multiple workouts before changing the program.";
   return `I’m the local rules-based Coach. I can help with progression, food targets, rest, muscle coverage, exercise swaps, shoulder safety, and your next workout. ${t.c||t.p?nutritionMessage():"Start by logging a workout or today’s food."}`;
 }
+function buildCoachContext(){
+  const t=totals(),coverage=muscleCoverage("week");
+  return {
+    nutrition:{calories:t.c,protein:t.p,calorieTarget:TARGETS.calories,proteinTarget:TARGETS.protein},
+    recentFoods:D.foods.slice(0,12).map(f=>({name:f.name,calories:f.cal,protein:f.protein,date:f.dateKey||f.date})),
+    weights:D.weights.slice(0,16).map(w=>({value:w.value,date:w.dateKey||w.date})),
+    workouts:D.workouts.slice(0,6).map(w=>({day:w.day,date:w.completedAt||w.date,earlyEndReason:w.earlyEndReason||w.endReason||"",exercises:(w.exercises||[]).map(e=>({name:e.name,range:e.range,plannedSets:e.plannedSets,sets:(e.sets||[]).map(s=>({weight:s.weight,reps:s.reps,rir:s.rir,actualRestSeconds:s.actualRestSeconds}))}))})),
+    muscleCoverage:Object.fromEntries(Object.entries(coverage).map(([muscle,value])=>[muscle,value.score])),
+    recentRest:D.restHistory.slice(0,20).map(r=>({exercise:r.exercise,actualSeconds:r.actualSeconds,recommendedSeconds:r.recommendedSeconds})),
+    recentSwaps:D.swaps.slice(0,12).map(s=>({from:s.from||s.original,to:s.to||s.replacement,reason:s.reason,permanent:!!s.permanent})),
+    recentConversation:D.coachMessages.slice(-8).map(m=>({role:m.role,text:m.text})),
+    currentWorkoutDay:day
+  };
+}
+async function requestAiCoach(message){
+  if(!COACH_API_URL.startsWith("https://"))throw new Error("Coach backend is not deployed");
+  const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),25000);
+  try{
+    const response=await fetch(COACH_API_URL,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({message,context:buildCoachContext()}),signal:controller.signal});
+    if(!response.ok)throw new Error(`Coach backend returned ${response.status}`);
+    const data=await response.json();if(!data.reply||typeof data.reply!=="string")throw new Error("Coach reply was empty");
+    return data.reply.trim();
+  }finally{clearTimeout(timeout);}
+}
 function renderCoach(){
   const box=document.getElementById("coachMessages");
   const messages=D.coachMessages.length?D.coachMessages:[{role:"coach",text:"Ask me about your next workout, progression, food, rest, swaps, or muscle coverage."}];
-  box.innerHTML=messages.slice(-40).map(m=>`<div class="bubble ${m.role==="user"?"user":"coach"}">${escapeHTML(m.text)}</div>`).join("");box.scrollTop=box.scrollHeight;
+  box.innerHTML=messages.slice(-40).map(m=>`<div class="bubble ${m.role==="user"?"user":"coach"}">${escapeHTML(m.text)}${m.role==="coach"?`<small>${m.source==="ai"?"Secure AI":"Local"}</small>`:""}</div>`).join("")+(coachPending?'<div class="bubble coach thinking">Thinking…</div>':"");box.scrollTop=box.scrollHeight;
 }
-function askCoach(text){D.coachMessages.push({id:uid(),role:"user",text,date:isoNow()});D.coachMessages.push({id:uid(),role:"coach",text:generateLocalCoachResponse(text,D),date:isoNow()});save();renderCoach();}
+async function askCoach(text){
+  text=String(text||"").trim();if(!text||coachPending)return;
+  D.coachMessages.push({id:uid(),role:"user",text,date:isoNow()});save();coachPending=true;renderCoach();
+  let reply,source="ai";
+  try{reply=await requestAiCoach(text);}
+  catch(_){reply=generateLocalCoachResponse(text,D);source="local";toast("Secure Coach unavailable · used local guidance");}
+  D.coachMessages.push({id:uid(),role:"coach",text:reply,source,date:isoNow()});coachPending=false;save();renderCoach();
+}
 function sendCoachMessage(){const input=document.getElementById("coachInput"),text=input.value.trim();if(!text)return;input.value="";askCoach(text);}
 
 function openModal(html){document.getElementById("modalSheet").innerHTML=html;document.getElementById("modal").classList.remove("hidden");document.body.classList.add("modal-open");}
