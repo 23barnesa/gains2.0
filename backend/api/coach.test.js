@@ -1,20 +1,22 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createCoachReply, createFoodEstimate, sanitizeContext } from "./coach.js";
+import { createCoachReply, createFoodEstimate, createSplitRecommendation, sanitizeContext } from "./coach.js";
 
 test("sanitizes and limits device context", () => {
   const context = sanitizeContext({
     nutrition: { calories: "2800", protein: -4 },
     recentFoods: Array.from({ length: 20 }, (_, index) => ({ name: `Food ${index}`, calories: 100, protein: 10 })),
     workouts: [{ day: "PUSH", exercises: [{ name: "Press", sets: [{ weight: 90, reps: 10, rir: 2, extra: "drop" }] }] }],
-    schedule: { weeklySchedule: "Mon: class 9-11", homeworkNeeds: "Lab Friday", workoutsPerWeek: 9, workoutDurationMinutes: 10, timezone: "America/Detroit" },
+    schedule: { weeklySchedule: "Mon: class 9-11", homeworkNeeds: "Lab Friday", workoutRequests: "Prioritize shoulders", workoutsPerWeek: 9, workoutDurationMinutes: 10, timezone: "America/Detroit" },
+    trainingPlan: { mode: "coach", splitId: "ppl", splitName: "Push / Pull / Legs", reason: "Original plan" },
     ignoredSecret: "never forward this"
   });
   assert.equal(context.nutrition.calories, 2800);
   assert.equal(context.nutrition.protein, 0);
   assert.equal(context.recentFoods.length, 12);
   assert.deepEqual(context.workouts[0].exercises[0].sets[0], { weight: 90, reps: 10, rir: 2, actualRestSeconds: null });
-  assert.deepEqual(context.schedule, { weeklySchedule: "Mon: class 9-11", homeworkNeeds: "Lab Friday", workoutsPerWeek: 6, workoutDurationMinutes: 30, timezone: "America/Detroit" });
+  assert.deepEqual(context.schedule, { weeklySchedule: "Mon: class 9-11", homeworkNeeds: "Lab Friday", workoutRequests: "Prioritize shoulders", workoutsPerWeek: 6, workoutDurationMinutes: 30, timezone: "America/Detroit" });
+  assert.deepEqual(context.trainingPlan, { mode: "coach", splitId: "ppl", splitName: "Push / Pull / Legs", reason: "Original plan" });
   assert.equal("ignoredSecret" in context, false);
 });
 
@@ -53,4 +55,15 @@ test("returns a structured combined food estimate", async () => {
   assert.deepEqual(estimate, { calories: 650, protein: 8, note: "Assumes one regular muffin and one 12 oz Coke." });
   assert.equal(request.text.format.type, "json_schema");
   assert.equal(request.text.format.strict, true);
+});
+
+test("returns a supported structured split recommendation", async () => {
+  process.env.OPENAI_API_KEY = "test-only";
+  let request;
+  const recommendation = await createSplitRecommendation({ schedule: { workoutsPerWeek: 4 } }, async (_url, options) => {
+    request = JSON.parse(options.body);
+    return { ok: true, json: async () => ({ output_text: JSON.stringify({ splitId: "upper_lower", reason: "Four available days support twice-weekly muscle frequency with manageable recovery." }) }) };
+  });
+  assert.deepEqual(recommendation, { splitId: "upper_lower", reason: "Four available days support twice-weekly muscle frequency with manageable recovery." });
+  assert.deepEqual(request.text.format.schema.properties.splitId.enum, ["ppl", "full_body", "upper_lower", "hybrid"]);
 });
