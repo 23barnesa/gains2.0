@@ -91,6 +91,13 @@ function cleanNumber(value, min = 0, max = 100_000) {
   return Number.isFinite(parsed) ? Math.min(max, Math.max(min, parsed)) : null;
 }
 
+function hasBackToBackThreeDaySchedule(schedule = {}) {
+  const text = `${schedule.weeklySchedule || ""} ${schedule.workoutRequests || ""}`.toLowerCase();
+  return /back[ -]?to[ -]?back|consecutive/.test(text)
+    || /fri(?:day)?[^\n]{0,80}sat(?:urday)?[^\n]{0,80}sun(?:day)?/.test(text)
+    || /sat(?:urday)?[^\n]{0,80}sun(?:day)?[^\n]{0,80}mon(?:day)?/.test(text);
+}
+
 function cleanSet(set = {}) {
   return {
     weight: cleanNumber(set.weight, 0, 2_000),
@@ -242,6 +249,9 @@ export async function createSplitRecommendation(context, fetchImpl = fetch) {
   let parsed;
   try { parsed = JSON.parse(outputText(data)); } catch (_) { throw new Error("OpenAI returned invalid split JSON"); }
   if (!["ppl", "full_body", "upper_lower", "hybrid"].includes(parsed.splitId)) throw new Error("OpenAI returned an unsupported split");
+  if (Number(context.schedule?.workoutsPerWeek) === 3 && hasBackToBackThreeDaySchedule(context.schedule)) {
+    return { splitId: "ppl", reason: "Your three available training days are back-to-back, so PPL avoids retraining the same muscles before they recover while still covering every major muscle group each week." };
+  }
   return { splitId: parsed.splitId, reason: cleanText(parsed.reason, 400) };
 }
 
