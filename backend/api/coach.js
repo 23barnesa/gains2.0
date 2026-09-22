@@ -3,6 +3,20 @@ const WINDOW_MS = 10 * 60 * 1000;
 const MAX_REQUESTS = 15;
 const MAX_BODY_BYTES = 32_000;
 const rateLimits = new Map();
+const FOOD_SCHEMA = {
+  type: "object",
+  properties: {
+    calories: { type: "number" },
+    protein: { type: "number" },
+    note: { type: "string" }
+  },
+  required: ["calories", "protein", "note"],
+  additionalProperties: false
+};
+
+function openAiApiKey() {
+  return process.env.OPENAI_API_KEY || process.env.open_ai_key;
+}
 
 const COACH_INSTRUCTIONS = `You are GainLog's concise hypertrophy coach. Use only the structured context provided and clearly say when there is not enough history.
 
@@ -18,6 +32,7 @@ Priorities:
 - Do not reward short rest or penalize longer rest. Do not add volume just because muscle coverage is below 100.
 - Nutrition targets are 2750 calories and 155 g protein. Do not encourage more food when targets are already met.
 - Bodyweight advice must use multi-week trends; never automatically change the calorie target.
+- When a weekly schedule is provided, protect fixed class/work commitments and meaningful homework blocks first. Suggest specific realistic workout windows, preserve recovery, and avoid crowding every free hour. Ask for missing timing details instead of inventing them.
 - Keep recommendations within fitness coaching, not medical diagnosis.`;
 
 function allowedOrigins() {
@@ -120,7 +135,14 @@ export function sanitizeContext(context = {}) {
       role: message.role === "user" ? "user" : "coach",
       text: cleanText(message.text, 600)
     })),
-    currentWorkoutDay: cleanText(context.currentWorkoutDay, 20)
+    currentWorkoutDay: cleanText(context.currentWorkoutDay, 20),
+    schedule: {
+      weeklySchedule: cleanText(context.schedule?.weeklySchedule, 2_000),
+      homeworkNeeds: cleanText(context.schedule?.homeworkNeeds, 1_000),
+      workoutsPerWeek: cleanNumber(context.schedule?.workoutsPerWeek, 1, 6),
+      workoutDurationMinutes: cleanNumber(context.schedule?.workoutDurationMinutes, 30, 150),
+      timezone: cleanText(context.schedule?.timezone, 80)
+    }
   };
 }
 
@@ -138,7 +160,7 @@ export async function createCoachReply(message, context, fetchImpl = fetch) {
   const response = await fetchImpl("https://api.openai.com/v1/responses", {
     method: "POST",
     headers: {
-      "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`,
+      "Authorization": `Bearer ${openAiApiKey()}`,
       "Content-Type": "application/json"
     },
     body: JSON.stringify({
@@ -157,6 +179,32 @@ export async function createCoachReply(message, context, fetchImpl = fetch) {
   return reply.slice(0, 3_000);
 }
 
+export async function createFoodEstimate(food, fetchImpl = fetch) {
+  const response = await fetchImpl("https://api.openai.com/v1/responses", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${openAiApiKey()}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      model: process.env.OPENAI_MODEL || "gpt-5.6-luna",
+      reasoning: { effort: "low" },
+      instructions: "Estimate normal easy-to-log portions for GainLog. Combine every food and drink in the user's description. Return approximate calories and protein, not false precision. If a calorie number is supplied, use it as an anchor while estimating the other items. Keep note short and state the main portion assumption.",
+      input: `Estimate this food entry: ${food}`,
+      text: { format: { type: "json_schema", name: "gainlog_food_estimate", strict: true, schema: FOOD_SCHEMA } },
+      max_output_tokens: 180,
+      store: false
+    })
+  });
+  if (!response.ok) throw new Error(`OpenAI food request failed with status ${response.status}`);
+  const data = await response.json();
+  let parsed;
+  try { parsed = JSON.parse(outputText(data)); } catch (_) { throw new Error("OpenAI returned invalid food JSON"); }
+  const calories = Number(parsed.calories), protein = Number(parsed.protein);
+  if (!Number.isFinite(calories) || !Number.isFinite(protein)) throw new Error("OpenAI returned invalid food values");
+  return { calories: Math.round(Math.min(20_000, Math.max(0, calories))), protein: Math.round(Math.min(1_000, Math.max(0, protein))), note: cleanText(parsed.note, 180) };
+}
+
 export default async function handler(req, res) {
   setCors(req, res);
   if (req.method === "OPTIONS") return res.status(204).end();
@@ -166,7 +214,19 @@ export default async function handler(req, res) {
   const contentLength = Number(req.headers["content-length"] || 0);
   const parsedBodyLength = Buffer.byteLength(JSON.stringify(req.body || {}));
   if (contentLength > MAX_BODY_BYTES || parsedBodyLength > MAX_BODY_BYTES) return res.status(413).json({ error: "Request too large" });
-  if (!process.env.OPENAI_API_KEY) return res.status(503).json({ error: "AI coaching is not configured" });
+  if (!openAiApiKey()) return res.status(503).json({ error: "AI coaching is not configured" });
+
+  if (req.body?.type === "food_estimate") {
+    const food = cleanText(req.body?.food, 500);
+    if (!food) return res.status(400).json({ error: "Food description is required" });
+    try {
+      const estimate = await createFoodEstimate(food);
+      return res.status(200).json({ ...estimate, source: "openai" });
+    } catch (error) {
+      console.error("Food estimate failed", error instanceof Error ? error.message : "Unknown error");
+      return res.status(502).json({ error: "Food estimation is temporarily unavailable" });
+    }
+  }
 
   const message = cleanText(req.body?.message, 1_000);
   if (!message) return res.status(400).json({ error: "Message is required" });
