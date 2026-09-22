@@ -9,7 +9,7 @@
   <meta name="apple-mobile-web-app-title" content="GainLog">
   <title>GainLog</title>
   <link rel="manifest" href="./manifest.webmanifest">
-  <link rel="stylesheet" href="./styles.css?v=2.5.0">
+  <link rel="stylesheet" href="./styles.css?v=2.6.0">
 </head>
 <body>
   <header><b>GAINLOG</b><button class="ghost small" onclick="go('settings')" aria-label="Settings">Settings</button></header>
@@ -30,7 +30,7 @@
       <div id="foods"></div>
     </section>
     <section id="workout">
-      <div class="page-title"><div><span class="eyebrow">Hypertrophy</span><h1>Workout</h1></div><button id="discardWorkout" class="ghost small hidden" onclick="discardDraft()">Discard</button></div>
+      <div class="page-title"><div><span class="eyebrow" id="activeSplitLabel">Hypertrophy</span><h1>Workout</h1></div><button id="discardWorkout" class="ghost small hidden" onclick="discardDraft()">Discard</button></div>
       <div id="days" class="days"></div><div id="workoutHint" class="workout-hint"></div><div id="ex"></div>
       <button class="primary wide finish-button" onclick="finishWorkout()">Finish workout</button>
     </section>
@@ -54,7 +54,7 @@
       <div class="page-title"><div><span class="eyebrow">Adaptive guidance</span><h1>Coach</h1></div><span id="coachConnectionStatus" class="pill">Secure AI ready</span></div>
       <div class="coach-note">Secure AI uses a limited view of your recent GainLog history and saved weekly schedule. If the backend is unavailable, replies are clearly labeled Local.</div>
       <div id="coachMessages" class="chat"></div>
-      <div class="quick-prompts"><button onclick="askCoach('Plan my workout and homework times this week using my saved schedule.')">Plan my week</button><button onclick="askCoach('What should I focus on next workout?')">Next workout</button><button onclick="askCoach('How is my muscle coverage?')">Muscle coverage</button><button onclick="askCoach('What should I eat tonight?')">Food tonight</button></div>
+      <div class="quick-prompts"><button onclick="optimizeTrainingSplit()">Optimize split</button><button onclick="askCoach('Plan my workout and homework times this week using my saved schedule.')">Plan my week</button><button onclick="askCoach('What should I focus on next workout?')">Next workout</button><button onclick="askCoach('How is my muscle coverage?')">Muscle coverage</button><button onclick="askCoach('What should I eat tonight?')">Food tonight</button></div>
       <div class="chat-input"><input id="coachInput" placeholder="Ask about training or food…" aria-label="Ask Coach"><button onclick="sendCoachMessage()">Send</button></div>
     </section>
     <section id="settings">
@@ -64,8 +64,17 @@
         <p class="muted compact">Paste your repeating class and work schedule. It stays on this device and is sent with your limited context only when you ask Secure AI Coach.</p>
         <label>Classes, work, and fixed commitments<textarea id="weeklySchedule" class="schedule-text" placeholder="Mon: class 9–11, work 2–6&#10;Tue: class 10–3&#10;Wed: class 9–11..."></textarea></label>
         <label>Homework and study needs<textarea id="homeworkNeeds" class="schedule-text short" placeholder="Circuits lab due Friday; protect two 2-hour homework blocks."></textarea></label>
+        <label>Workout requests and priorities<textarea id="workoutRequests" class="schedule-text short" placeholder="Prioritize shoulders; prefer stable machines; avoid long sessions."></textarea></label>
         <div class="two-col schedule-numbers"><label>Workouts per week<input id="scheduleWorkoutCount" type="number" min="1" max="6" inputmode="numeric"></label><label>Workout length<input id="scheduleWorkoutLength" type="number" min="30" max="150" step="5" inputmode="numeric"><small>minutes</small></label></div>
         <div class="button-stack"><button class="primary wide" onclick="saveSchedule()">Save schedule</button><button class="ghost wide" onclick="planMyWeek()">Save & ask Coach to plan</button></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h2>Adaptive training split</h2><span id="activeSplitPill" class="pill">PPL</span></div>
+        <p id="splitReason" class="muted compact"></p>
+        <label>Split control<select id="splitMode" onchange="setSplitMode(this.value)"><option value="coach">Coach chooses for my schedule</option><option value="manual">Keep my selected split</option></select></label>
+        <label>Current split<select id="splitChoice" onchange="selectTrainingSplit(this.value)"><option value="ppl">Push / Pull / Legs</option><option value="full_body">Full Body A / B / C</option><option value="upper_lower">Upper / Lower</option><option value="hybrid">Upper / Lower + PPL</option></select></label>
+        <button class="primary wide" onclick="optimizeTrainingSplit()">Optimize for muscle growth</button>
+        <small>Coach changes the weekly structure—not your safety rules. Existing workouts and exercise history remain untouched.</small>
       </div>
       <div class="card">
         <div class="card-head"><h2>Notifications</h2><span id="notificationStatus" class="pill">Not enabled</span></div>
@@ -81,7 +90,7 @@
       </div>
       <div class="card"><h2>Data</h2><p class="muted">Your data stays on this device unless you export it.</p><div class="button-row"><button onclick="backup()">Backup JSON</button><button onclick="document.getElementById('restoreFile').click()">Restore JSON</button></div><input id="restoreFile" class="hidden" type="file" accept="application/json" onchange="restoreBackup(event)"></div>
       <div class="card"><h2>Training guardrails</h2><p>Compounds: usually 1–2 RIR. Isolations: usually 0–2 RIR. Stop or swap any movement causing joint pain.</p></div>
-      <div class="card"><h2>App</h2><p class="muted">GainLog 2.5 · AI food estimates and schedule-aware Coach</p><button id="updateButton" class="hidden" onclick="applyUpdate()">Install update</button></div>
+      <div class="card"><h2>App</h2><p class="muted">GainLog 2.6 · adaptive split planning</p><button id="updateButton" class="hidden" onclick="applyUpdate()">Install update</button></div>
     </section>
   </main>
   <div id="restTimer" class="rest-timer hidden"><div><span>REST</span><strong id="restClock">1:00</strong><small id="restExercise"></small></div><div class="timer-actions"><button onclick="addRest(15)">+15</button><button onclick="addRest(30)">+30</button><button onclick="skipRest()">Skip</button></div></div>
@@ -90,6 +99,6 @@
   <nav>
     <button data-screen="today" onclick="go('today')"><b>⌂</b><span>Today</span></button><button data-screen="food" onclick="go('food')"><b>＋</b><span>Food</span></button><button data-screen="workout" onclick="go('workout')"><b>▣</b><span>Workout</span></button><button data-screen="progress" onclick="go('progress')"><b>↗</b><span>Progress</span></button><button data-screen="coachScreen" onclick="go('coachScreen')"><b>✦</b><span>Coach</span></button>
   </nav>
-  <script src="./app.js?v=2.5.0"></script>
+  <script src="./app.js?v=2.6.0"></script>
 </body>
 </html>
