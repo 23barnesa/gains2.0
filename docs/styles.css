@@ -3,7 +3,7 @@
 html{background:#0b0e12}
 body{margin:0;padding-bottom:calc(96px + env(safe-area-inset-bottom));background:radial-gradient(circle at 50% -10%,#17231c 0,#0b0e12 35%);min-height:100vh}
 body.modal-open{overflow:hidden}
-button,input,textarea{font:inherit}
+button,input,textarea,select{font:inherit}
 button{min-height:44px;background:#27303a;color:#fff;border:0;border-radius:12px;padding:11px 14px;font-weight:750;cursor:pointer}
 button:disabled{opacity:.4}
 button.primary{background:var(--accent);color:var(--accent-dark)}
@@ -37,8 +37,8 @@ progress::-webkit-progress-bar{background:#283039}
 progress::-webkit-progress-value{background:var(--accent);border-radius:10px}
 .coach-preview{cursor:pointer}
 .coach-preview p{margin:12px 0 0}
-textarea,input{width:100%;background:#0c1116;color:#fff;border:1px solid #35414d;border-radius:12px;padding:12px;font-size:16px;min-height:44px;outline:none}
-input:focus,textarea:focus{border-color:#76c973;box-shadow:0 0 0 3px #91e58b15}
+textarea,input,select{width:100%;background:#0c1116;color:#fff;border:1px solid #35414d;border-radius:12px;padding:12px;font-size:16px;min-height:44px;outline:none}
+input:focus,textarea:focus,select:focus{border-color:#76c973;box-shadow:0 0 0 3px #91e58b15}
 textarea{height:90px;resize:none;margin-bottom:10px}
 .schedule-card>label,.schedule-numbers label{display:block;color:var(--muted);font-size:12px}
 .schedule-text{height:118px;margin-top:7px}
