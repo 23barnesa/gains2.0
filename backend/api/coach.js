@@ -13,6 +13,15 @@ const FOOD_SCHEMA = {
   required: ["calories", "protein", "note"],
   additionalProperties: false
 };
+const SPLIT_SCHEMA = {
+  type: "object",
+  properties: {
+    splitId: { type: "string", enum: ["ppl", "full_body", "upper_lower", "hybrid"] },
+    reason: { type: "string" }
+  },
+  required: ["splitId", "reason"],
+  additionalProperties: false
+};
 
 function openAiApiKey() {
   return process.env.OPENAI_API_KEY || process.env.open_ai_key;
@@ -33,6 +42,8 @@ Priorities:
 - Nutrition targets are 2750 calories and 155 g protein. Do not encourage more food when targets are already met.
 - Bodyweight advice must use multi-week trends; never automatically change the calorie target.
 - When a weekly schedule is provided, protect fixed class/work commitments and meaningful homework blocks first. Suggest specific realistic workout windows, preserve recovery, and avoid crowding every free hour. Ask for missing timing details instead of inventing them.
+- Do not assume Push/Pull/Legs is always optimal. Choose training structure from the user's realistic weekly frequency, session length, spacing between available days, recovery, completion history, muscle coverage, and explicit workout requests. Prefer productive per-muscle frequency and recoverable sessions over a fashionable split name.
+- Program changes are Level 3 changes: recommend them only when schedule or repeated history supports them. Preserve the user's exercises and safety preferences wherever possible.
 - Keep recommendations within fitness coaching, not medical diagnosis.`;
 
 function allowedOrigins() {
@@ -139,9 +150,16 @@ export function sanitizeContext(context = {}) {
     schedule: {
       weeklySchedule: cleanText(context.schedule?.weeklySchedule, 2_000),
       homeworkNeeds: cleanText(context.schedule?.homeworkNeeds, 1_000),
+      workoutRequests: cleanText(context.schedule?.workoutRequests, 1_000),
       workoutsPerWeek: cleanNumber(context.schedule?.workoutsPerWeek, 1, 6),
       workoutDurationMinutes: cleanNumber(context.schedule?.workoutDurationMinutes, 30, 150),
       timezone: cleanText(context.schedule?.timezone, 80)
+    },
+    trainingPlan: {
+      mode: cleanText(context.trainingPlan?.mode, 20),
+      splitId: cleanText(context.trainingPlan?.splitId, 30),
+      splitName: cleanText(context.trainingPlan?.splitName, 80),
+      reason: cleanText(context.trainingPlan?.reason, 300)
     }
   };
 }
@@ -205,6 +223,28 @@ export async function createFoodEstimate(food, fetchImpl = fetch) {
   return { calories: Math.round(Math.min(20_000, Math.max(0, calories))), protein: Math.round(Math.min(1_000, Math.max(0, protein))), note: cleanText(parsed.note, 180) };
 }
 
+export async function createSplitRecommendation(context, fetchImpl = fetch) {
+  const response = await fetchImpl("https://api.openai.com/v1/responses", {
+    method: "POST",
+    headers: { "Authorization": `Bearer ${openAiApiKey()}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: process.env.OPENAI_MODEL || "gpt-5.6-luna",
+      reasoning: { effort: "low" },
+      instructions: `${COACH_INSTRUCTIONS}\nChoose exactly one supported split: ppl, full_body, upper_lower, or hybrid. PPL supports three back-to-back days or six distributed days; full_body supports one to three well-spaced days; upper_lower supports four days; hybrid supports five days. The actual schedule spacing overrides the simple day-count rule. Keep the reason under 55 words and explain recovery, frequency, and schedule fit.`,
+      input: `GAINLOG CONTEXT\n${JSON.stringify(sanitizeContext(context))}\n\nRecommend the most productive recoverable split.`,
+      text: { format: { type: "json_schema", name: "gainlog_split_recommendation", strict: true, schema: SPLIT_SCHEMA } },
+      max_output_tokens: 180,
+      store: false
+    })
+  });
+  if (!response.ok) throw new Error(`OpenAI split request failed with status ${response.status}`);
+  const data = await response.json();
+  let parsed;
+  try { parsed = JSON.parse(outputText(data)); } catch (_) { throw new Error("OpenAI returned invalid split JSON"); }
+  if (!["ppl", "full_body", "upper_lower", "hybrid"].includes(parsed.splitId)) throw new Error("OpenAI returned an unsupported split");
+  return { splitId: parsed.splitId, reason: cleanText(parsed.reason, 400) };
+}
+
 export default async function handler(req, res) {
   setCors(req, res);
   if (req.method === "OPTIONS") return res.status(204).end();
@@ -225,6 +265,16 @@ export default async function handler(req, res) {
     } catch (error) {
       console.error("Food estimate failed", error instanceof Error ? error.message : "Unknown error");
       return res.status(502).json({ error: "Food estimation is temporarily unavailable" });
+    }
+  }
+
+  if (req.body?.type === "split_recommendation") {
+    try {
+      const recommendation = await createSplitRecommendation(req.body?.context || {});
+      return res.status(200).json({ ...recommendation, source: "openai" });
+    } catch (error) {
+      console.error("Split recommendation failed", error instanceof Error ? error.message : "Unknown error");
+      return res.status(502).json({ error: "Split planning is temporarily unavailable" });
     }
   }
 
