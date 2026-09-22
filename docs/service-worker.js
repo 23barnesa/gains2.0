@@ -1,5 +1,5 @@
-const CACHE = "gainlog-v2.3.0";
-const SHELL = ["./","./index.html","./styles.css?v=2.3.0","./app.js?v=2.3.0","./manifest.webmanifest"];
+const CACHE = "gainlog-v2.5.0";
+const SHELL = ["./","./index.html","./styles.css?v=2.5.0","./app.js?v=2.5.0","./manifest.webmanifest"];
 
 self.addEventListener("install", event => {
   event.waitUntil(
