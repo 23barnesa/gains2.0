@@ -9,7 +9,7 @@
   <meta name="apple-mobile-web-app-title" content="GainLog">
   <title>GainLog</title>
   <link rel="manifest" href="./manifest.webmanifest">
-  <link rel="stylesheet" href="./styles.css?v=2.6.0">
+  <link rel="stylesheet" href="./styles.css?v=2.6.2">
 </head>
 <body>
   <header><b>GAINLOG</b><button class="ghost small" onclick="go('settings')" aria-label="Settings">Settings</button></header>
@@ -31,7 +31,7 @@
     </section>
     <section id="workout">
       <div class="page-title"><div><span class="eyebrow" id="activeSplitLabel">Hypertrophy</span><h1>Workout</h1></div><button id="discardWorkout" class="ghost small hidden" onclick="discardDraft()">Discard</button></div>
-      <div id="days" class="days"></div><div id="workoutHint" class="workout-hint"></div><div id="ex"></div>
+      <div id="days" class="days"></div><div id="weekProgress" class="week-progress"></div><div id="workoutHint" class="workout-hint"></div><div id="ex"></div>
       <button class="primary wide finish-button" onclick="finishWorkout()">Finish workout</button>
     </section>
     <section id="progress">
@@ -77,6 +77,18 @@
         <small>Coach changes the weekly structure—not your safety rules. Existing workouts and exercise history remain untouched.</small>
       </div>
       <div class="card">
+        <div class="card-head"><h2>Training location</h2><span class="pill">OU Rec</span></div>
+        <p><strong>Oakland University Recreation Center</strong></p>
+        <p class="muted compact">Swap and Coach recommendations can use OU’s selectorized and plate-loaded machines, cable crossovers, Hoist MotionCage, free weights, TRX/bands, and the machines you already use there.</p>
+        <small>Exact machines can change. If an option is unavailable or occupied, use Swap → Equipment taken.</small>
+      </div>
+      <div class="card">
+        <div class="card-head"><h2>Evidence-based programming</h2><span class="pill">Hypertrophy</span></div>
+        <p class="muted compact">GainLog does not rank a split or exercise as universally best. It chooses a schedule you can recover from and complete, then distributes productive weekly work across it.</p>
+        <p class="muted compact">Exercises are selected for the target muscle, stable progression, a comfortable controllable range, available equipment, and your feedback. Rep ranges, RIR, rest, and volume are adjusted from trends—not one unusual set.</p>
+        <small>Joint pain and your scoliosis constraints always override an automatic recommendation.</small>
+      </div>
+      <div class="card">
         <div class="card-head"><h2>Notifications</h2><span id="notificationStatus" class="pill">Not enabled</span></div>
         <p id="notificationHelp" class="muted compact">Enable alerts from your installed GainLog app.</p>
         <button id="enableNotifications" class="primary wide" onclick="enableNotifications()">Enable notifications</button>
@@ -90,7 +102,7 @@
       </div>
       <div class="card"><h2>Data</h2><p class="muted">Your data stays on this device unless you export it.</p><div class="button-row"><button onclick="backup()">Backup JSON</button><button onclick="document.getElementById('restoreFile').click()">Restore JSON</button></div><input id="restoreFile" class="hidden" type="file" accept="application/json" onchange="restoreBackup(event)"></div>
       <div class="card"><h2>Training guardrails</h2><p>Compounds: usually 1–2 RIR. Isolations: usually 0–2 RIR. Stop or swap any movement causing joint pain.</p></div>
-      <div class="card"><h2>App</h2><p class="muted">GainLog 2.6 · adaptive split planning</p><button id="updateButton" class="hidden" onclick="applyUpdate()">Install update</button></div>
+      <div class="card"><h2>App</h2><p class="muted">GainLog 2.6.3 · evidence-based adaptive programming</p><button id="updateButton" class="hidden" onclick="applyUpdate()">Install update</button></div>
     </section>
   </main>
   <div id="restTimer" class="rest-timer hidden"><div><span>REST</span><strong id="restClock">1:00</strong><small id="restExercise"></small></div><div class="timer-actions"><button onclick="addRest(15)">+15</button><button onclick="addRest(30)">+30</button><button onclick="skipRest()">Skip</button></div></div>
@@ -99,6 +111,6 @@
   <nav>
     <button data-screen="today" onclick="go('today')"><b>⌂</b><span>Today</span></button><button data-screen="food" onclick="go('food')"><b>＋</b><span>Food</span></button><button data-screen="workout" onclick="go('workout')"><b>▣</b><span>Workout</span></button><button data-screen="progress" onclick="go('progress')"><b>↗</b><span>Progress</span></button><button data-screen="coachScreen" onclick="go('coachScreen')"><b>✦</b><span>Coach</span></button>
   </nav>
-  <script src="./app.js?v=2.6.0"></script>
+  <script src="./app.js?v=2.6.3"></script>
 </body>
 </html>

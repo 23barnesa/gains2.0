@@ -1,6 +1,15 @@
-const APP_VERSION = 7;
+const APP_VERSION = 8;
 const COACH_API_URL = "https://gainlog-coach-23barnesa.vercel.app/api/coach";
 const TARGETS = { calories: 2750, protein: 155 };
+const EVIDENCE_RULES = {
+  split:"No split is inherently superior when weekly volume is equated. Choose the structure that fits the available days, distributes work into productive sessions, supports recovery, and can be completed consistently.",
+  frequency:"Use frequency to distribute recoverable weekly volume and maintain set quality; do not chase a frequency target by itself.",
+  volume:"Use a productive, recoverable amount of hard training and change it conservatively from repeated history. More sets are not automatically better.",
+  effort:"Most hypertrophy sets should finish close to failure without requiring failure. Keep compounds around 1–2 RIR and isolations around 0–2 RIR unless safety or technique requires more margin.",
+  loading:"A broad range of loads can build muscle when sets are performed with appropriate effort. Use the prescribed rep range and double progression instead of treating one rep range as uniquely anabolic.",
+  rest:"Rest long enough to preserve productive reps and technique. The 60/75/90-second timers are starting points, not caps or performance goals.",
+  exerciseSelection:"Choose exercises that train the intended muscle through a comfortable, controllable range, are stable enough to progress, fit available equipment, and do not cause joint pain. No exercise is mandatory."
+};
 const PROGRAM = {
   PUSH: [
     ["Hammer Strength Incline Press",3,"6–10"],["Hammer Strength Decline Press",3,"8–12"],
@@ -57,11 +66,38 @@ const EXERCISES = {
   "Hip Thrust / Glute Drive": { rest:90, muscles:{"Glutes":1,"Hamstrings":.2}, swaps:["Glute Drive Machine","Cable Pull-Through","45° Hip Extension"] },
   "Calf Raise": { rest:60, muscles:{"Calves":1}, swaps:["Seated Calf Raise","Leg-Press Calf Raise","Standing Calf Machine"] }
 };
+const OU_GYM_PROFILE = {
+  id:"oakland-rec",name:"Oakland University Recreation Center",
+  verifiedEquipment:["Selectorized machines","Plate-loaded machines","Cable crossover stations","Hoist MotionCage","Dumbbells and free weights","Olympic bars and bumper plates","TRX and resistance bands","Medicine balls and functional space"],
+  userConfirmedEquipment:["Hammer Strength incline press","Hammer Strength decline press","Hack squat / leg press","Leg extension","Seated and lying leg curls","Glute drive","Calf raise machines"]
+};
+const OU_OPTION_GROUPS = {
+  "Hammer Strength Incline Press":["Incline Machine Press","Neutral-Grip Incline DB Press","Low-to-High Cable Press","Dumbbell Incline Press","Single-Arm Incline Cable Press"],
+  "Hammer Strength Decline Press":["Decline Machine Press","Plate-Loaded Chest Press","High-to-Low Cable Press","Chest Press Machine","Dumbbell Floor Press"],
+  "Cable Fly":["Pec Deck","Machine Fly","Single-Arm Cable Fly","Low-to-High Cable Fly","High-to-Low Cable Fly"],
+  "Machine Shoulder Press":["Neutral-Grip Machine Press","Seated Neutral-Grip DB Press","Cable Front Raise","Single-Arm Cable Press","Cable Y Raise"],
+  "Cable Lateral Raise":["Machine Lateral Raise","Leaning Cable Lateral Raise","Behind-Body Cable Lateral Raise","DB Lateral Raise","Single-Arm MotionCage Lateral Raise"],
+  "Rope Triceps Pushdown":["Straight-Bar Pushdown","Single-Arm Cable Pushdown","Reverse-Grip Cable Pushdown","Cross-Body Cable Extension","Machine Dip"],
+  "Overhead Cable Triceps Extension":["Single-Arm Overhead Extension","Cross-Body Cable Extension","Cable Skull Crusher","Rope Overhead Extension","Seated DB Overhead Extension"],
+  "Neutral-Grip Lat Pulldown":["Close-Grip Pulldown","Wide-Grip Pulldown","Single-Arm Cable Pulldown","Plate-Loaded Pulldown","Band-Assisted Pull-Up"],
+  "Chest-Supported Row":["Machine High Row","Seated Cable Row","Chest-Supported DB Row","Single-Arm Cable Row","Plate-Loaded Row"],
+  "Single-Arm Cable Lat Pulldown":["Single-Arm Machine Pulldown","Cable Pullover","Kneeling Single-Arm Pulldown","Straight-Arm Cable Pulldown","MotionCage Lat Pulldown"],
+  "Reverse Pec Deck":["Cable Rear-Delt Fly","Chest-Supported Rear-Delt Raise","Face Pull","Single-Arm Rear-Delt Cable Fly","Band Rear-Delt Pull-Apart"],
+  "Incline DB Curl":["Straight-Bar Cable Curl","EZ-Bar Curl","Alternating DB Curl","Bayesian Cable Curl","Seated DB Curl"],
+  "Hammer Curl":["Rope Hammer Curl","Cross-Body Hammer Curl","Alternating DB Hammer Curl","Cable Hammer Curl","Machine Curl"],
+  "Hack Squat / Leg Press":["Leg Press","Hack Squat","Single-Leg Press","Cable Belt Squat","Plate-Loaded Leg Press"],
+  "Leg Extension":["Single-Leg Extension","Leg Extension Machine","Cable Leg Extension","Single-Leg Press","Heels-Low Leg Press"],
+  "Seated Leg Curl":["Lying Leg Curl","Standing Single-Leg Curl","Cable Leg Curl","Single-Leg Seated Curl","DB Leg Curl"],
+  "Lying Leg Curl":["Seated Leg Curl","Standing Single-Leg Curl","Cable Leg Curl","Single-Leg Lying Curl","DB Leg Curl"],
+  "Hip Thrust / Glute Drive":["Glute Drive Machine","Cable Pull-Through","DB Hip Thrust","Single-Leg Hip Thrust","Cable Glute Kickback"],
+  "Calf Raise":["Seated Calf Raise","Leg-Press Calf Raise","Standing Calf Machine","Single-Leg DB Calf Raise","Hack-Squat Calf Raise"]
+};
+Object.entries(OU_OPTION_GROUPS).forEach(([base,options])=>{const source=EXERCISES[base];if(!source)return;source.swaps=[...new Set([...(source.swaps||[]),...options])];source.swaps.forEach(name=>{if(!EXERCISES[name])EXERCISES[name]={rest:source.rest,muscles:{...source.muscles},swaps:[base,...source.swaps.filter(option=>option!==name)].slice(0,6)};});});
 const MUSCLES = ["Upper chest","Mid/lower chest","Front delts","Side delts","Rear delts","Lats","Upper/mid back","Biceps","Triceps","Quads","Hamstrings","Glutes","Calves"];
 const NOTIFICATION_DEFAULTS = { enabled:false, restComplete:true, workout:true, workoutTime:"11:00", nutrition:true, nutritionTime:"20:00", bodyweight:true, bodyweightTime:"08:00" };
 const SCHEDULE_DEFAULTS = { weeklySchedule:"", homeworkNeeds:"", workoutRequests:"", workoutsPerWeek:3, workoutDurationMinutes:60, updatedAt:null };
 const TRAINING_PLAN_DEFAULTS = { mode:"coach", splitId:"ppl", reason:"Your original Push / Pull / Legs plan is preserved until Coach optimization is requested.", updatedAt:null };
-const DEFAULTS = { version:APP_VERSION, foods:[], weights:[], workouts:[], swaps:[], preferences:{}, coachMessages:[], earlyEndReasons:[], programOverrides:{}, restHistory:[], restPreferences:{}, notificationHistory:[], notifications:{...NOTIFICATION_DEFAULTS}, schedule:{...SCHEDULE_DEFAULTS}, trainingPlan:{...TRAINING_PLAN_DEFAULTS}, workoutDraft:null };
+const DEFAULTS = { version:APP_VERSION, foods:[], weights:[], workouts:[], swaps:[], preferences:{}, coachMessages:[], earlyEndReasons:[], programOverrides:{}, restHistory:[], restPreferences:{}, notificationHistory:[], notifications:{...NOTIFICATION_DEFAULTS}, schedule:{...SCHEDULE_DEFAULTS}, trainingPlan:{...TRAINING_PLAN_DEFAULTS}, trainingWeek:null, workoutDraft:null };
 
 function loadData() {
   let stored = {};
@@ -73,6 +109,7 @@ function loadData() {
   merged.schedule={...SCHEDULE_DEFAULTS,...(stored.schedule&&typeof stored.schedule==="object"&&!Array.isArray(stored.schedule)?stored.schedule:{})};
   merged.trainingPlan={...TRAINING_PLAN_DEFAULTS,...(stored.trainingPlan&&typeof stored.trainingPlan==="object"&&!Array.isArray(stored.trainingPlan)?stored.trainingPlan:{})};
   if(!TRAINING_PROGRAMS[merged.trainingPlan.splitId])merged.trainingPlan.splitId="ppl";
+  if(!merged.trainingWeek||typeof merged.trainingWeek!=="object"||Array.isArray(merged.trainingWeek))merged.trainingWeek=null;
   merged.version = APP_VERSION;
   return merged;
 }
@@ -86,6 +123,7 @@ let pendingSplit = null;
 let waitingWorker = null;
 let coachPending = false;
 let foodPending = false;
+let pendingWorkoutSummaryId = null;
 let coachConnectionState = localStorage.getItem("gainlog-coach-status") || "ready";
 let calendarCursor = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
 let selectedCalendarDate = dateKey();
@@ -182,14 +220,44 @@ function currentProgram() {
   const plan=TRAINING_PROGRAMS[D.trainingPlan.splitId]?.days||PROGRAM;
   return (plan[day]||Object.values(plan)[0]).map((e,i)=>{
     const override=D.programOverrides[day]?.[i];
-    return {base:e[0],name:override?.name||e[0],sets:e[1],range:e[2],temporary:D.workoutDraft?.swaps?.[i]||null};
+    const weekly=D.workoutDraft?.day===day?D.workoutDraft.weeklyOverrides?.[i]:D.trainingWeek?.overrides?.[day]?.[i];
+    return {base:e[0],name:override?.name||weekly?.name||e[0],sets:e[1],range:e[2],temporary:D.workoutDraft?.swaps?.[i]||null,weeklyReason:override?null:weekly?.reason};
   }).map(e=>({...e,name:e.temporary?.name||e.name}));
 }
 function trainingDays(){return Object.keys(TRAINING_PROGRAMS[D.trainingPlan.splitId]?.days||PROGRAM);}
+function stimulusBeforeWeek(weekKey){
+  const end=new Date(`${weekKey}T00:00:00`),start=new Date(end);start.setDate(start.getDate()-8);const points=Object.fromEntries(MUSCLES.map(m=>[m,0]));let workoutCount=0;
+  D.workouts.forEach(workout=>{const when=workoutDate(workout);if(!Number.isFinite(when.getTime())||when<start||when>=end)return;workoutCount++;(workout.exercises||[]).forEach(exercise=>{const muscles=EXERCISES[exercise.name]?.muscles||EXERCISES[exercise.baseName]?.muscles||{};(exercise.sets||[]).forEach(set=>{const rir=number(set.rir),effort=rir===null?.75:Math.max(.45,Math.min(1.05,1.05-rir*.1));Object.entries(muscles).forEach(([muscle,factor])=>{if(points[muscle]!==undefined)points[muscle]+=factor*effort;});});});});
+  return {points,workoutCount};
+}
+function weeklyEmphasisPlan(week){
+  const history=stimulusBeforeWeek(week.weekKey);if(history.workoutCount<2)return {overrides:{},notes:[],reason:"More completed workouts are needed before Coach changes exercise emphasis."};
+  const priorities=(D.schedule.workoutRequests||"").toLowerCase(),replacements={"Upper chest":"Hammer Strength Incline Press","Mid/lower chest":"Hammer Strength Decline Press","Side delts":"Cable Lateral Raise","Rear delts":"Reverse Pec Deck","Lats":"Neutral-Grip Lat Pulldown","Upper/mid back":"Chest-Supported Row","Biceps":"Incline DB Curl","Triceps":"Rope Triceps Pushdown","Quads":"Leg Extension","Hamstrings":"Seated Leg Curl"};
+  const pairs=[["Upper chest","Mid/lower chest"],["Lats","Upper/mid back"],["Quads","Hamstrings"],["Biceps","Triceps"]],candidates=[];
+  pairs.forEach(([a,b])=>{const av=history.points[a]||0,bv=history.points[b]||0;if(av-bv>=2&&(av+.5)/(bv+.5)>=1.45)candidates.push({from:a,to:b,gap:av-bv});if(bv-av>=2&&(bv+.5)/(av+.5)>=1.45)candidates.push({from:b,to:a,gap:bv-av});});
+  const front=history.points["Front delts"]||0,side=history.points["Side delts"]||0,rear=history.points["Rear delts"]||0,target=side<=rear?"Side delts":"Rear delts",targetValue=Math.min(side,rear);if(front-targetValue>=2&&(front+.5)/(targetValue+.5)>=1.45)candidates.push({from:"Front delts",to:target,gap:front-targetValue});
+  const aliases={"Upper chest":["upper chest"],"Mid/lower chest":["lower chest","mid chest","chest"],"Front delts":["front delt","shoulder"],"Side delts":["side delt","shoulder"],"Rear delts":["rear delt","shoulder"],Lats:["lat"],"Upper/mid back":["back"],Biceps:["bicep","arm"],Triceps:["tricep","arm"],Quads:["quad","leg"],Hamstrings:["hamstring","leg"]};
+  const requested=muscle=>(aliases[muscle]||[]).some(term=>priorities.includes(term)),plan=TRAINING_PROGRAMS[D.trainingPlan.splitId]?.days||PROGRAM,used=new Set(),overrides={},notes=[];
+  candidates.sort((a,b)=>b.gap-a.gap).forEach(candidate=>{if(notes.length>=2||requested(candidate.from)||!replacements[candidate.to])return;for(const session of week.sessions){const entries=plan[session.day]||[];const index=entries.findIndex((entry,i)=>{if(used.has(`${session.day}:${i}`)||D.programOverrides[session.day]?.[i])return false;const muscles=EXERCISES[entry[0]]?.muscles||{},primary=Object.entries(muscles).sort((x,y)=>y[1]-x[1])[0]?.[0];return primary===candidate.from;});if(index<0)continue;const replacement=replacements[candidate.to],reason=`Last week favored ${candidate.from.toLowerCase()}, so this slot emphasizes ${candidate.to.toLowerCase()} for balance.`;overrides[session.day]=overrides[session.day]||{};overrides[session.day][index]={name:replacement,from:entries[index][0],reason};used.add(`${session.day}:${index}`);notes.push(reason);break;}});
+  return {overrides,notes,reason:notes.length?"Coach shifted up to two exercise slots using last week’s stimulus. Total planned sets were not increased.":"Last week’s muscle balance did not justify changing your exercises."};
+}
+function trainingWeekKey(){const now=new Date(),dayIndex=(now.getDay()+6)%7,start=new Date(now);start.setDate(now.getDate()-dayIndex);start.setHours(12,0,0,0);return dateKey(start);}
+function ensureTrainingWeek(){
+  const key=trainingWeekKey(),base=trainingDays(),count=Math.min(6,Math.max(1,D.schedule.workoutsPerWeek||base.length));
+  if(D.trainingWeek?.weekKey===key&&D.trainingWeek?.splitId===D.trainingPlan.splitId&&Array.isArray(D.trainingWeek.sessions))return D.trainingWeek;
+  const start=Math.max(0,Math.round(number(D.trainingPlan.rotationIndex)||0))%base.length;
+  D.trainingWeek={weekKey:key,splitId:D.trainingPlan.splitId,sessions:Array.from({length:count},(_,i)=>({id:uid(),day:base[(start+i)%base.length],status:"planned",workoutId:null}))};
+  const emphasis=weeklyEmphasisPlan(D.trainingWeek);D.trainingWeek.overrides=emphasis.overrides;D.trainingWeek.emphasisNotes=emphasis.notes;D.trainingWeek.emphasisReason=emphasis.reason;D.trainingWeek.adaptationVersion=1;
+  const weekStart=new Date(`${key}T00:00:00`);D.workouts.filter(workout=>workoutDate(workout)>=weekStart).slice().reverse().forEach(workout=>{const slot=D.trainingWeek.sessions.find(s=>s.status!=="done"&&s.day===workout.day);if(slot){slot.status="done";slot.workoutId=workout.id;slot.completedAt=workout.completedAt||workout.date;}});save();return D.trainingWeek;
+}
+function weekStatus(){const week=ensureTrainingWeek(),completed=week.sessions.filter(s=>s.status==="done").map(s=>s.day),remaining=week.sessions.filter(s=>s.status!=="done").map(s=>s.day);return {week,completed,remaining,nextSession:remaining[0]||null};}
+function renderWeekProgress(){const box=document.getElementById("weekProgress");if(!box)return;const status=weekStatus(),emphasis=status.week.emphasisNotes?.length?`<button class="week-emphasis" onclick="showWeeklyEmphasis()">Coach emphasis · ${status.week.emphasisNotes.length} change${status.week.emphasisNotes.length===1?"":"s"}</button>`:"";box.innerHTML=`<div><span>THIS WEEK</span><b>${status.completed.length}/${status.week.sessions.length} done</b></div><div class="week-sessions">${status.week.sessions.map(s=>`<span class="${s.status==="done"?"done":""}">${escapeHTML(s.day)}${s.status==="done"?" ✓":""}</span>`).join("")}</div>${emphasis}`;}
+function showWeeklyEmphasis(){const week=ensureTrainingWeek(),notes=week.emphasisNotes||[];openModal(`<div class="sheet-handle"></div><span class="pill">Weekly emphasis</span><h2>${notes.length?"Coach adjusted this week":"No exercise changes"}</h2><p class="muted">${escapeHTML(week.emphasisReason||"")}</p>${notes.map(note=>`<div class="coach-note">${escapeHTML(note)}</div>`).join("")}<button class="primary wide" onclick="closeModal()">Done</button>`);}
 function renderDays(){document.getElementById("days").innerHTML=trainingDays().map(d=>`<button class="${d===day?"on":""}" onclick="selectDay('${d}')">${d}</button>`).join("");}
 function selectDay(d){if(D.workoutDraft?.hasData&&D.workoutDraft.day!==d)return toast("Finish or discard your current workout first");day=d;ensureDraft();renderDays();renderWorkout();}
 function ensureDraft(){
-  if(!D.workoutDraft||D.workoutDraft.day!==day)D.workoutDraft={id:uid(),day,startedAt:isoNow(),sets:{},swaps:{},hasData:false};
+  if(!D.workoutDraft||D.workoutDraft.day!==day)D.workoutDraft={id:uid(),day,startedAt:isoNow(),sets:{},swaps:{},weeklyOverrides:{...(D.trainingWeek?.overrides?.[day]||{})},hasData:false};
+  else if(!D.workoutDraft.hasData&&!D.workoutDraft.weeklyOverrides)D.workoutDraft.weeklyOverrides={...(D.trainingWeek?.overrides?.[day]||{})};
   save();
 }
 function draftKey(ex,set){return `${ex}:${set}`;}
@@ -201,15 +269,30 @@ function progressionText(e,last){
   if(!last)return "First session logged here. Use a controlled starting load.";
   const sets=(last.exercise.sets||[]).filter(s=>number(s.reps)!==null), range=parseRange(e.range);
   if(!sets.length)return "No completed sets last time.";
-  const allTop=sets.length>=e.sets&&sets.every(s=>number(s.reps)>=range.max);
+  const reps=sets.map(s=>number(s.reps)), complete=sets.length>=e.sets;
+  const allTop=complete&&sets.slice(0,e.sets).every(s=>number(s.reps)>=range.max);
+  const anyTop=reps.some(rep=>rep>=range.max), belowCount=reps.filter(rep=>rep<range.min).length,anyBelow=belowCount>0;
   const avgRir=sets.reduce((a,s)=>a+(number(s.rir)??2),0)/sets.length;
-  const weight=sets[0]?.weight;
-  if(allTop&&avgRir<=2)return `Increase weight next session. You reached ${sets.map(s=>s.reps).join("/")} around ${avgRir.toFixed(1)} RIR.`;
-  if(allTop&&avgRir>2)return "Keep the load. You reached the rep target with high RIR, so push the sets harder first.";
-  return `Keep ${weight?weight+" lb":"the load"}. Try to beat ${sets.map(s=>s.reps||"–").join("/")}.`;
+  const weights=[...new Set(sets.map(s=>number(s.weight)).filter(value=>value!==null))];
+  const load=weights.length===1?`${weights[0]} lb`:"the same working load";
+  const repLine=reps.join("/");
+  if(!complete){
+    if(anyTop)return `Keep ${load}. ${range.max} is the rep ceiling—complete all ${e.sets} working sets and bring the remaining sets into ${range.min}–${range.max}, rather than exceeding ${range.max}.`;
+    return `Keep ${load}. Last time only ${sets.length} of ${e.sets} sets were logged; complete the planned sets in the ${range.min}–${range.max} range before changing weight.`;
+  }
+  if(weights.length>1)return `Repeat the working loads from ${repLine}. Keep every set within ${range.min}–${range.max}; use one consistent load when practical before judging progression.`;
+  if(allTop&&avgRir<=2)return `Increase by the smallest practical amount next time. You reached ${repLine} at about ${avgRir.toFixed(1)} RIR with all planned sets at the top of the range.`;
+  if(allTop)return `Keep ${load} once more. Repeat ${repLine} with clean execution and confirm the sets finish around 0–2 RIR before increasing—do not exceed ${range.max} reps.`;
+  if(anyBelow&&avgRir<=2&&(reps[0]<range.min||belowCount>=Math.ceil(sets.length/2)))return `Lower ${load} by the smallest practical amount next time. Too many hard sets fell below the ${range.min}-rep minimum (${repLine}), so the load is currently limiting productive reps.`;
+  if(anyBelow&&avgRir>2)return `Keep ${load} for now. Some sets missed the ${range.min}-rep minimum, but the average RIR was ${avgRir.toFixed(1)}—push closer to the target effort before reducing weight.`;
+  if(anyBelow)return `Keep ${load}. Only the later set${belowCount===1?"":"s"} fell below ${range.min}; bring ${repLine} into range, and consider more rest if the drop repeats before lowering weight.`;
+  if(anyTop)return `Keep ${load}. Match the ${range.max}-rep set and add reps to the lower sets without exceeding ${range.max} per set. Last time: ${repLine}.`;
+  const total=reps.reduce((sum,rep)=>sum+rep,0);
+  return `Keep ${load}. Aim for at least ${total+1} total reps across the sets, staying within ${range.min}–${range.max} per set. Last time: ${repLine}.`;
 }
 function renderWorkout(){
-  ensureDraft(); const box=document.getElementById("ex"), program=currentProgram();
+  ensureTrainingWeek();ensureDraft();const box=document.getElementById("ex"), program=currentProgram();
+  renderWeekProgress();
   const splitLabel=document.getElementById("activeSplitLabel");if(splitLabel)splitLabel.textContent=TRAINING_PROGRAMS[D.trainingPlan.splitId].name;
   document.getElementById("discardWorkout").classList.toggle("hidden",!D.workoutDraft.hasData);
   document.getElementById("workoutHint").textContent=D.workoutDraft.hasData?"Workout in progress · saved on this device":"Log a complete set to start its rest timer.";
@@ -221,7 +304,7 @@ function renderWorkout(){
       : `<b>${lastSets.map(s=>`${escapeHTML(s.weight??"—")} lb × ${escapeHTML(s.reps)}`).join(" · ")}</b>`;
     const lastHtml=last?`<div class="last-time"><span>LAST TIME</span><div class="last-result">${lastResult}</div></div>`:"";
     const sets=Array.from({length:e.sets},(_,si)=>{const v=D.workoutDraft.sets[draftKey(ei,si)]||{};return `<div class="set ${v.logged?"logged":""}" data-row="${ei}-${si}"><button class="set-number" onclick="logSet(${ei},${si})">${v.logged?"✓":si+1}</button><input inputmode="decimal" placeholder="lb" value="${escapeHTML(v.weight||"")}" oninput="updateDraft(${ei},${si},'weight',this.value)"><input inputmode="numeric" placeholder="reps" value="${escapeHTML(v.reps||"")}" oninput="updateDraft(${ei},${si},'reps',this.value)"><input inputmode="decimal" placeholder="RIR" value="${escapeHTML(v.rir||"")}" oninput="updateDraft(${ei},${si},'rir',this.value)"></div>`;}).join("");
-    return `<article class="exercise"><div class="exercise-head"><div><h3>${escapeHTML(e.name)}</h3><small>${e.sets} sets · ${e.range} reps</small></div><button class="swap" onclick="showSwap(${ei})">↻ Swap</button></div>${lastHtml}<p class="guidance">${escapeHTML(progressionText(e,last))}</p><div class="set set-labels"><span></span><span>Weight</span><span>Reps</span><span>RIR</span></div>${sets}</article>`;
+    return `<article class="exercise"><div class="exercise-head"><div><h3>${escapeHTML(e.name)}</h3><small>${e.sets} sets · ${e.range} reps</small>${e.weeklyReason?`<small class="weekly-tag">Weekly emphasis</small>`:""}</div><button class="swap" onclick="showSwap(${ei})">↻ Swap</button></div>${lastHtml}<p class="guidance">${escapeHTML(e.weeklyReason||progressionText(e,last))}</p><div class="set set-labels"><span></span><span>Weight</span><span>Reps</span><span>RIR</span></div>${sets}</article>`;
   }).join("");
 }
 function updateDraft(ex,set,type,value){ensureDraft();const key=draftKey(ex,set);D.workoutDraft.sets[key]={...(D.workoutDraft.sets[key]||{}),[type]:value};D.workoutDraft.hasData=Object.values(D.workoutDraft.sets).some(s=>s.weight||s.reps||s.rir);save();document.getElementById("discardWorkout").classList.toggle("hidden",!D.workoutDraft.hasData);}
@@ -247,7 +330,7 @@ function addRest(seconds){if(!activeRest)return;activeRest.endAt+=seconds*1000;a
 function skipRest(){finishActiveRest(true);}
 function finishActiveRest(skipped){
   if(!activeRest)return;const actual=Math.max(0,Math.round((Date.now()-activeRest.startedAt)/1000));
-  D.restHistory.unshift({id:activeRest.id,exercise:activeRest.exercise,startedAt:new Date(activeRest.startedAt).toISOString(),actualSeconds:actual,recommendedSeconds:activeRest.recommended,skipped:!!skipped,workoutDraftId:D.workoutDraft?.id});save();
+  D.restHistory.unshift({id:activeRest.id,exercise:activeRest.exercise,startedAt:new Date(activeRest.startedAt).toISOString(),actualSeconds:actual,recommendedSeconds:activeRest.recommended,skipped:!!skipped,workoutDraftId:D.workoutDraft?.id,exerciseIndex:activeRest.source?.ex,setIndex:activeRest.source?.set});save();
   activeRest=null;localStorage.removeItem("gainlog-active-rest");clearInterval(restInterval);restInterval=null;document.getElementById("restTimer")?.classList.add("hidden");
 }
 
@@ -268,7 +351,7 @@ function applySwap(permanent){
 
 function collectWorkout(){
   const program=currentProgram();
-  return program.map((e,ei)=>({name:e.name,baseName:e.base,range:e.range,plannedSets:e.sets,sets:Array.from({length:e.sets},(_,si)=>D.workoutDraft.sets[draftKey(ei,si)]||{}).filter(s=>s.logged).map(s=>({weight:number(s.weight),reps:number(s.reps),rir:number(s.rir),loggedAt:s.loggedAt}))}));
+  return program.map((e,ei)=>({name:e.name,baseName:e.base,range:e.range,plannedSets:e.sets,sets:Array.from({length:e.sets},(_,si)=>({set:D.workoutDraft.sets[draftKey(ei,si)]||{},si})).filter(item=>item.set.logged).map(({set,si})=>{const rest=D.restHistory.find(item=>item.workoutDraftId===D.workoutDraft.id&&item.exerciseIndex===ei&&item.setIndex===si);return {weight:number(set.weight),reps:number(set.reps),rir:number(set.rir),loggedAt:set.loggedAt,actualRestSeconds:rest?.actualSeconds??null};})}));
 }
 function finishWorkout(){
   finishActiveRest(false);const exercises=collectWorkout(),completed=exercises.reduce((n,e)=>n+e.sets.length,0),planned=exercises.reduce((n,e)=>n+e.plannedSets,0);
@@ -281,9 +364,26 @@ function askEarlyEnd(exercises,completed,planned){
   openModal(`<div class="sheet-handle"></div><h2>Why did you end early?</h2><p class="muted">${completed} of ${planned} planned sets completed.</p><div class="early-options">${["Too difficult","Ran out of time","Shoulder bothered me","Low energy","Equipment issue","Something else"].map(r=>`<button onclick="finishWithReason('${r}')">${r}</button>`).join("")}</div><button class="ghost wide" onclick="closeModal()">Keep workout open</button>`);
 }
 function finishWithReason(reason){const p=window.pendingFinish;D.earlyEndReasons.unshift({id:uid(),date:isoNow(),day,reason,completed:p.completed,planned:p.planned});saveWorkout(p.exercises,reason);}
+function localWorkoutFeedback(workout){
+  const increases=[],reductions=[],effort=[],below=[];
+  workout.exercises.forEach(exercise=>{const range=parseRange(exercise.range),sets=exercise.sets||[];if(sets.length<exercise.plannedSets)return;const reps=sets.map(set=>number(set.reps)),avgRir=sets.reduce((sum,set)=>sum+(number(set.rir)??2),0)/sets.length,belowCount=reps.filter(rep=>rep<range.min).length;if(sets.every(set=>number(set.reps)>=range.max)&&avgRir<=2)increases.push(exercise.name);else if(avgRir<=2&&(reps[0]<range.min||belowCount>=Math.ceil(sets.length/2)))reductions.push(exercise.name);else if(avgRir>2)effort.push(exercise.name);else if(belowCount)below.push(exercise.name);});
+  const actions=[];
+  if(increases.length)actions.push(`${increases.slice(0,2).join(" and ")} reached the top of every planned set at appropriate RIR—raise the load by the smallest practical amount next time.`);
+  if(reductions.length)actions.push(`Lower ${reductions.slice(0,2).join(" and ")} by the smallest practical amount next time; too many hard sets missed the minimum rep target.`);
+  if(effort.length)actions.push(`Push ${effort.slice(0,2).join(" and ")} closer to the prescribed RIR while staying inside the rep range.`);
+  else if(below.length)actions.push(`Keep the load on ${below.slice(0,2).join(" and ")} and bring every set into range; review rest only if the drop repeats.`);
+  if(actions.length)return actions.slice(0,2).join(" ");
+  return "Solid session. Keep the current loads and add reps within each exercise’s range before increasing weight.";
+}
+function completeWeeklySession(workout){const status=weekStatus(),matching=status.week.sessions.find(s=>s.status!=="done"&&s.day===workout.day),slot=matching||status.week.sessions.find(s=>s.status!=="done");if(slot){if(!matching)slot.day=workout.day;slot.status="done";slot.workoutId=workout.id;slot.completedAt=workout.completedAt;}const base=trainingDays(),index=base.indexOf(workout.day);if(index>=0)D.trainingPlan.rotationIndex=(index+1)%base.length;return weekStatus();}
+function localWeekAdjustment(workout,status){if(!status.nextSession)return `${workout.day} is complete and this week’s planned rotation is finished.`;return `${workout.day} is complete. Next is ${status.nextSession}; ${status.remaining.length} planned session${status.remaining.length===1?" remains":"s remain"} this week.`;}
+function workoutFeedbackPayload(workout,status){return {type:"workout_feedback",workout:{day:workout.day,earlyEndReason:workout.earlyReason||"",exercises:workout.exercises.map(exercise=>{const previous=findPreviousExercise(exercise.name,workout.id);return {...exercise,previousSets:previous?.exercise?.sets||[]};})},week:{completed:status.completed,remaining:status.remaining,nextSession:status.nextSession,weeklySchedule:D.schedule.weeklySchedule,homeworkNeeds:D.schedule.homeworkNeeds,emphasisNotes:D.trainingWeek?.emphasisNotes||[]}};}
+async function requestWorkoutFeedback(workout,status){const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),25000);try{const response=await fetch(COACH_API_URL,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(workoutFeedbackPayload(workout,status)),signal:controller.signal});if(!response.ok)throw new Error(`Workout feedback returned ${response.status}`);const result=await response.json();if(!result.feedback||!result.weekAdjustment)throw new Error("Workout feedback incomplete");return result;}finally{clearTimeout(timeout);}}
+function renderWorkoutSummary(workout){if(pendingWorkoutSummaryId!==workout.id)return;const feedback=workout.coachFeedback||localWorkoutFeedback(workout),weekAdjustment=workout.weekAdjustment||localWeekAdjustment(workout,weekStatus()),source=workout.feedbackSource==="ai"?"Secure AI":workout.feedbackPending?"Local now · Secure AI thinking":"Local";openModal(`<div class="sheet-handle"></div><span class="pill">${escapeHTML(workout.day)} complete</span><h2>Coach review</h2><p>${escapeHTML(feedback)}</p><div class="coach-note">${escapeHTML(weekAdjustment)}</div><small>${source}</small><button class="primary wide" onclick="closeModal()">Done</button>`);}
+async function upgradeWorkoutFeedback(workout,status){try{const result=await requestWorkoutFeedback(workout,status),saved=D.workouts.find(w=>w.id===workout.id);if(!saved)return;saved.coachFeedback=result.feedback;saved.weekAdjustment=result.weekAdjustment;saved.feedbackSource="ai";saved.feedbackPending=false;save();if(pendingWorkoutSummaryId===saved.id)renderWorkoutSummary(saved);}catch(_){const saved=D.workouts.find(w=>w.id===workout.id);if(saved){saved.feedbackPending=false;save();if(pendingWorkoutSummaryId===saved.id)renderWorkoutSummary(saved);}}}
 function saveWorkout(exercises,earlyReason){
-  D.workouts.unshift({id:uid(),draftId:D.workoutDraft.id,day,date:new Date().toLocaleDateString(),completedAt:isoNow(),startedAt:D.workoutDraft.startedAt,exercises,earlyReason});
-  D.workoutDraft=null;save();closeModal();toast(`${day} workout saved`);ensureDraft();renderWorkout();renderProgress();renderToday();
+  const workout={id:uid(),draftId:D.workoutDraft.id,day,date:new Date().toLocaleDateString(),completedAt:isoNow(),startedAt:D.workoutDraft.startedAt,exercises,earlyReason,feedbackPending:true};
+  ensureTrainingWeek();D.workouts.unshift(workout);const status=completeWeeklySession(workout);workout.coachFeedback=localWorkoutFeedback(workout);workout.weekAdjustment=localWeekAdjustment(workout,status);workout.feedbackSource="local";D.workoutDraft=null;if(status.nextSession)day=status.nextSession;save();ensureDraft();renderDays();renderWorkout();renderProgress();renderToday();pendingWorkoutSummaryId=workout.id;renderWorkoutSummary(workout);toast(`${workout.day} workout saved`);upgradeWorkoutFeedback(workout,status);
 }
 function discardDraft(){openModal('<div class="sheet-handle"></div><h2>Discard workout?</h2><p class="muted">Only the current unfinished entries will be removed. Saved workout history is untouched.</p><button class="danger wide" onclick="confirmDiscard()">Discard workout</button><button class="ghost wide" onclick="closeModal()">Cancel</button>');}
 function confirmDiscard(){finishActiveRest(false);D.workoutDraft=null;save();closeModal();ensureDraft();renderWorkout();toast("Workout discarded");}
@@ -353,6 +453,7 @@ function generateLocalCoachResponse(message,appState=D){
   const q=message.toLowerCase(),t=totals();
   if(/shoulder|pain|hurt|discomfort/.test(q))return "Joint pain is different from muscle fatigue. Stop the painful movement and use a comfortable, stable alternative. If pain persists or affects daily activity, get it assessed rather than training through it.";
   if(/eat|food|protein|calorie|tonight/.test(q))return nutritionMessage();
+  if(/science|scientific|evidence|research/.test(q))return `${EVIDENCE_RULES.split} ${EVIDENCE_RULES.exerciseSelection} ${EVIDENCE_RULES.rest}`;
   if(/coverage|muscle/.test(q)){const scores=muscleCoverage("week"),rank=Object.entries(scores).sort((a,b)=>a[1].score-b[1].score),low=rank.filter(x=>x[1].score>0).slice(0,2).map(x=>x[0]);return D.workouts.length?`Your current 7-day coverage is lowest for ${low.join(" and ")||"muscles without recent work"}. A low score alone is not a reason to add sets; finish your normal rotation first.`:"Log a workout first and I’ll estimate muscle coverage from completed sets and RIR.";}
   if(/rest|timer|between sets/.test(q)){const recent=D.restHistory.slice(0,12);if(!recent.length)return "Start with 60 seconds for smaller isolations, 75 seconds for moderate isolations, and 90 seconds for demanding compounds. Adjust based on repeated performance, not one set.";const avg=Math.round(recent.reduce((a,r)=>a+r.actualSeconds,0)/recent.length);return `Your recent average actual rest is about ${avg} seconds. Keep it if reps and RIR stay reasonably stable across sets.`;}
   if(/split|routine|program|schedule|class|homework|study|plan my week|workout time/.test(q)){const s=appState.schedule||SCHEDULE_DEFAULTS,plan=TRAINING_PROGRAMS[appState.trainingPlan?.splitId||"ppl"];if(!s.weeklySchedule)return `Your active split is ${plan.name}. Add your weekly commitments in Settings so Coach can decide whether PPL, Full Body, Upper/Lower, or the five-day hybrid fits better.`;return `Your active split is ${plan.name}. Your saved plan calls for ${s.workoutsPerWeek} workout${s.workoutsPerWeek===1?"":"s"} of about ${s.workoutDurationMinutes} minutes. Use Optimize split to compare frequency, recovery, session length, and your saved workout request before changing it.`;}
@@ -375,7 +476,9 @@ function buildCoachContext(){
     recentConversation:D.coachMessages.slice(-8).map(m=>({role:m.role,text:m.text})),
     currentWorkoutDay:day,
     schedule:{weeklySchedule:D.schedule.weeklySchedule,homeworkNeeds:D.schedule.homeworkNeeds,workoutRequests:D.schedule.workoutRequests,workoutsPerWeek:D.schedule.workoutsPerWeek,workoutDurationMinutes:D.schedule.workoutDurationMinutes,timezone:Intl.DateTimeFormat().resolvedOptions().timeZone||""},
-    trainingPlan:{mode:D.trainingPlan.mode,splitId:D.trainingPlan.splitId,splitName:TRAINING_PROGRAMS[D.trainingPlan.splitId].name,reason:D.trainingPlan.reason}
+    trainingPlan:{mode:D.trainingPlan.mode,splitId:D.trainingPlan.splitId,splitName:TRAINING_PROGRAMS[D.trainingPlan.splitId].name,reason:D.trainingPlan.reason},
+    trainingWeek:{weekKey:D.trainingWeek?.weekKey||"",emphasisNotes:D.trainingWeek?.emphasisNotes||[],remaining:D.trainingWeek?.sessions?.filter(session=>session.status!=="done").map(session=>session.day)||[]},
+    gymProfile:OU_GYM_PROFILE
   };
 }
 async function requestAiCoach(message){
@@ -423,7 +526,7 @@ function localSplitRecommendation(){
   const count=D.schedule.workoutsPerWeek,text=`${D.schedule.weeklySchedule} ${D.schedule.workoutRequests}`.toLowerCase();
   let splitId=count<=3?"full_body":count===4?"upper_lower":count===5?"hybrid":"ppl";
   if(count===3&&(/fri[^\n]*sat[^\n]*sun|consecutive|back.to.back/.test(text)))splitId="ppl";
-  const reason=splitId==="full_body"?"Full-body training raises muscle frequency when you have three or fewer well-spaced sessions.":splitId==="upper_lower"?"Four days fits Upper/Lower well: each muscle can be trained about twice weekly with manageable sessions.":splitId==="hybrid"?"Five days supports an Upper/Lower plus PPL hybrid with good frequency and flexible emphasis.":"PPL fits six sessions—or three back-to-back days—without repeatedly training the same muscles before they recover.";
+  const reason=splitId==="full_body"?"With three or fewer well-spaced sessions, Full Body distributes weekly work across the available days without requiring long single-muscle sessions.":splitId==="upper_lower"?"Four days fits Upper/Lower well because it distributes weekly work into manageable sessions with recovery between repeated muscle exposures.":splitId==="hybrid"?"Five days lets the hybrid distribute weekly volume across shorter sessions while preserving room for recovery and emphasis work.":"PPL fits six sessions—or three back-to-back days—because adjacent sessions train different muscle groups. The split is chosen for schedule and recovery, not because PPL is inherently superior.";
   return {splitId,reason,source:"local"};
 }
 async function requestAiSplit(){
@@ -439,14 +542,14 @@ async function optimizeTrainingSplit(){
 }
 function applyTrainingSplit(splitId,reason,mode=D.trainingPlan.mode){
   if(!TRAINING_PROGRAMS[splitId]||D.workoutDraft?.hasData)return false;
-  D.trainingPlan={mode,splitId,reason,updatedAt:isoNow()};day=Object.keys(TRAINING_PROGRAMS[splitId].days)[0];D.workoutDraft=null;save();ensureDraft();renderDays();renderWorkout();renderScheduleSettings();return true;
+  D.trainingPlan={mode,splitId,reason,rotationIndex:0,updatedAt:isoNow()};D.trainingWeek=null;day=Object.keys(TRAINING_PROGRAMS[splitId].days)[0];D.workoutDraft=null;save();renderDays();renderWorkout();renderScheduleSettings();return true;
 }
 function applySplitRecommendation(){if(!pendingSplit)return;const plan=TRAINING_PROGRAMS[pendingSplit.splitId];if(applyTrainingSplit(pendingSplit.splitId,pendingSplit.reason,"coach")){closeModal();toast(`${plan.name} is now active`);}}
 function setSplitMode(mode){D.trainingPlan.mode=mode==="manual"?"manual":"coach";D.trainingPlan.updatedAt=isoNow();save();renderScheduleSettings();}
 function selectTrainingSplit(splitId){if(D.workoutDraft?.hasData){renderScheduleSettings();return toast("Finish or discard the current workout first");}const plan=TRAINING_PROGRAMS[splitId];if(!plan)return;if(applyTrainingSplit(splitId,`You manually selected ${plan.name}.`,"manual"))toast(`${plan.name} is now active`);}
 
 function openModal(html){document.getElementById("modalSheet").innerHTML=html;document.getElementById("modal").classList.remove("hidden");document.body.classList.add("modal-open");}
-function closeModal(){document.getElementById("modal").classList.add("hidden");document.body.classList.remove("modal-open");pendingSwap=null;pendingSplit=null;}
+function closeModal(){document.getElementById("modal").classList.add("hidden");document.body.classList.remove("modal-open");pendingSwap=null;pendingSplit=null;pendingWorkoutSummaryId=null;}
 function modalBackdrop(e){if(e.target.id==="modal")closeModal();}
 function backup(){const blob=new Blob([JSON.stringify(D,null,2)],{type:"application/json"}),url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download=`gainlog-backup-${dateKey()}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
 function restoreBackup(event){
